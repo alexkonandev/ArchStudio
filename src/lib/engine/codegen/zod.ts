@@ -74,7 +74,7 @@ export function generateZod(ast: SchemaAst): string {
   const lines: string[] = [
     'import { z } from "zod";',
     "",
-    "// GÉNÉRÉ AUTOMATIQUEMENT PAR ARCHSTUDIO — NE PAS MODIFIER MANUELLEMENT.",
+    "// GÉNÉRÉ AUTOMATIQUEMENT PAR MODELIZIA — NE PAS MODIFIER MANUELLEMENT.",
     "// Schémas Zod dérivés du schéma visuel ; types inférés via z.infer.",
     "",
   ];

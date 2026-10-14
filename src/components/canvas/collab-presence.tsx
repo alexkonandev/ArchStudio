@@ -135,7 +135,7 @@ export function CollabToggle({ enabled, count, onToggle }: { enabled: boolean; c
 export function collabToast(enabled: boolean): void {
   pushToast(enabled ? "Revue collaborative activée" : "Revue collaborative désactivée", {
     type: "info",
-    description: enabled ? "Ouvrez ArchStudio dans un 2ᵉ onglet pour voir les curseurs temps réel." : "Présence temps réel coupée.",
+    description: enabled ? "Ouvrez Modelizia dans un 2ᵉ onglet pour voir les curseurs temps réel." : "Présence temps réel coupée.",
   });
 }
 

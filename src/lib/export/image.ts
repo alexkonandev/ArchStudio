@@ -28,7 +28,7 @@ function hdFilter(node: unknown): boolean {
 }
 
 /** Serialize the React Flow viewport to a high-resolution PNG download. */
-export async function exportCanvasPng(filename = "archstudio-diagram.png", pixelRatio = 3): Promise<void> {
+export async function exportCanvasPng(filename = "modelizia-diagram.png", pixelRatio = 3): Promise<void> {
   const root = document.querySelector(".react-flow") as HTMLElement | null;
   if (!root) throw new Error("Le canvas n'est pas prêt pour l'export.");
   const rect = root.getBoundingClientRect();
@@ -79,7 +79,7 @@ const loadShot = async (): Promise<{
 };
 
 /** Export the canvas as a clean vector SVG (nodes + edges only). */
-export async function exportCanvasSvg(filename = "archstudio-diagram.svg"): Promise<void> {
+export async function exportCanvasSvg(filename = "modelizia-diagram.svg"): Promise<void> {
   const root = document.querySelector(".react-flow") as HTMLElement | null;
   if (!root) throw new Error("Le canvas n'est pas prêt pour l'export.");
   const shot = await loadShot();
@@ -100,7 +100,7 @@ export async function exportCanvasSvg(filename = "archstudio-diagram.svg"): Prom
  * Full project archive: every generated artifact (Prisma, SQL dialects, TS,
  * Zod, migration report, raw JSON) plus a README — downloaded as one .zip.
  */
-export async function exportProjectZip(ast: SchemaAst, filename = "archstudio-project.zip"): Promise<void> {
+export async function exportProjectZip(ast: SchemaAst, filename = "modelizia-project.zip"): Promise<void> {
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const files = generateCodeFiles(ast);
@@ -113,7 +113,7 @@ export async function exportProjectZip(ast: SchemaAst, filename = "archstudio-pr
   zip.file("schema.json", JSON.stringify(ast, null, 2));
   zip.file(
     "README.md",
-    `# ArchStudio — export du projet\n\nGénéré le ${new Date().toISOString()}.\n\n## Contenu\n\n${files.map((f) => `- \`${f.filename}\` — ${f.label}`).join("\n")}\n- \`schema.json\` — AST brut (réimportable via Importer)\n- \`schema.prisma\` / \`schema.sql\` — alias directs\n\n## Reprise\n\nOuvrez le dossier dans ArchStudio via Importer (Prisma / SQL / JSON).\n`,
+    `# Modelizia — export du projet\n\nGénéré le ${new Date().toISOString()}.\n\n## Contenu\n\n${files.map((f) => `- \`${f.filename}\` — ${f.label}`).join("\n")}\n- \`schema.json\` — AST brut (réimportable via Importer)\n- \`schema.prisma\` / \`schema.sql\` — alias directs\n\n## Reprise\n\nOuvrez le dossier dans Modelizia via Importer (Prisma / SQL / JSON).\n`,
   );
   const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
   const url = URL.createObjectURL(blob);
@@ -150,7 +150,7 @@ const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const buildFallbackSvg = (width: number, height: number): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.floor(width)}" height="${Math.floor(height)}"><rect width="100%" height="100%" fill="#f8fafc"/><text x="24" y="48" fill="#0f172a" font-family="monospace" font-size="16">${esc("Diagramme ArchStudio")}</text><text x="24" y="72" fill="#64748b" font-family="monospace" font-size="12">${esc("Exportez le canvas lorsqu'un diagramme est visible.")}</text></svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.floor(width)}" height="${Math.floor(height)}"><rect width="100%" height="100%" fill="#f8fafc"/><text x="24" y="48" fill="#0f172a" font-family="monospace" font-size="16">${esc("Diagramme Modelizia")}</text><text x="24" y="72" fill="#64748b" font-family="monospace" font-size="12">${esc("Exportez le canvas lorsqu'un diagramme est visible.")}</text></svg>`;
 
 /** Download a text artifact (JSON / Prisma / SQL). */
 export function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8"): void {

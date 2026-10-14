@@ -11,7 +11,7 @@ export function generateReport(ast: SchemaAst): string {
   const lines: string[] = [
     "# Rapport de migration du schéma",
     "",
-    "_Généré automatiquement par ArchStudio. À vérifier avant exécution sur une base de données._",
+    "_Généré automatiquement par Modelizia. À vérifier avant exécution sur une base de données._",
     "",
     "## Vue d'ensemble",
     "",

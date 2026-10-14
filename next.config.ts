@@ -12,6 +12,14 @@ const isDev = process.env.NODE_ENV !== "production";
  *   (e.g. React Flow, html-to-image) are applied via inline `<style>`.
  * - `img-src` allows `blob:`/`data:` for the PNG diagram export.
  * - `connect-src 'self' ws:` keeps HMR websockets working in development.
+ * - `worker-src 'self' blob:` permits the `blob:` URL Monaco uses when
+ *   bootstrapping a worker. Monaco's own workers are currently disabled —
+ *   Turbopack cannot bundle them, so `installMonacoEnvironment()` makes
+ *   `MonacoEnvironment.getWorker` throw and Monaco falls back to its
+ *   main-thread worker (see `src/lib/monaco/monaco-environment.ts`). We keep
+ *   `blob:` here so that the CSP is not the reason a future worker would fail:
+ *   if worker bundling ever becomes possible, a blocked `blob:` bootstrap would
+ *   surface as the same opaque rejection we just fixed.
  * For a stricter, nonce-based policy see `node_modules/next/dist/docs` →
  * "How to set a Content Security Policy (CSP)" (uses a proxy + nonce).
  */
@@ -22,6 +30,7 @@ const cspDirectives = [
   "img-src 'self' blob: data:",
   "font-src 'self' data:",
   `connect-src 'self'${isDev ? " ws:" : ""}`,
+  "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

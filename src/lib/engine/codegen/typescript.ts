@@ -59,7 +59,7 @@ const formatInterface = (table: Table, enums: EnumDefinition[]): string[] => {
  */
 export function generateTypeScript(ast: SchemaAst): string {
   const lines: string[] = [
-    "// GÉNÉRÉ AUTOMATIQUEMENT PAR ARCHSTUDIO — NE PAS MODIFIER MANUELLEMENT.",
+    "// GÉNÉRÉ AUTOMATIQUEMENT PAR MODELIZIA — NE PAS MODIFIER MANUELLEMENT.",
     "// Interfaces TypeScript dérivées du schéma visuel.",
     "",
   ];

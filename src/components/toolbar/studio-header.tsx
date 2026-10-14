@@ -15,7 +15,6 @@ import {
   Redo2,
   Search,
   Undo2,
-  Users,
   Wand2,
 } from "lucide-react";
 import { Menu } from "@base-ui/react/menu";
@@ -168,26 +167,62 @@ export function StudioHeader() {
   return (
     <header
       data-testid="studio-header"
-      className="glass-panel flex h-14 shrink-0 items-center gap-3 border-b backdrop-blur-md px-4"
+      className="glass-panel flex h-14 shrink-0 items-center justify-between gap-3 border-b backdrop-blur-md px-4"
     >
-      <Link
-        href="/"
-        className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="ArchStudio — accueil"
-      >
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Database className="size-4" />
-        </span>
-        <h1 className="text-base font-semibold tracking-tight">ArchStudio</h1>
-      </Link>
+      {/* ── Zone gauche : logo + projet + menu fichier ── */}
+      <div className="flex min-w-0 items-center gap-2">
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Modelizia — accueil"
+        >
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Database className="size-4" />
+          </span>
+          <h1 className="text-base font-semibold tracking-tight">Modelizia</h1>
+        </Link>
 
-      <div className="hidden items-center gap-2 lg:flex">
-        <Badge variant="secondary">{tables.length} table{tables.length === 1 ? "" : "s"}</Badge>
-        <Badge variant="secondary">{relations.length} relation{relations.length === 1 ? "" : "s"}</Badge>
+        <div className="hidden items-center gap-2 lg:flex">
+          <Badge variant="secondary">{tables.length} table{tables.length === 1 ? "" : "s"}</Badge>
+          <Badge variant="secondary">{relations.length} relation{relations.length === 1 ? "" : "s"}</Badge>
+        </div>
+
+        {/* Menu projet : regroupe les actions fichier pour alléger la topbar. */}
+        <Menu.Root>
+          <Menu.Trigger
+            aria-label="Actions du projet"
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-popup-open:bg-muted"
+          >
+            <MoreHorizontal className="size-4" />
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50">
+              <Menu.Popup className="glass-panel min-w-44 rounded-xl p-1 shadow-xl ring-1 ring-foreground/10 backdrop-blur-md">
+                <Menu.Item className={menuItemClass} onClick={() => openFileAction("import")}>
+                  Importer
+                </Menu.Item>
+                <Menu.Item className={menuItemClass} onClick={() => openFileAction("templates")}>
+                  <LayoutTemplate className="size-4" />
+                  Modèles
+                </Menu.Item>
+                <Menu.Item className={menuItemClass} onClick={() => openFileAction("export")}>
+                  Exporter
+                </Menu.Item>
+                <Menu.Item
+                  className={cn(menuItemClass, "text-destructive data-highlighted:bg-destructive/10")}
+                  onClick={() => openFileAction("reset")}
+                >
+                  Effacer
+                </Menu.Item>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
-        <div className="flex items-center gap-1">
+      {/* ── Zone centrale : outils canvas + score de santé ── */}
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-2">
+        <div className="flex shrink-0 items-center gap-1">
           <Tooltip label="Annuler" shortcut="mod+z">
             <Button
               size="icon"
@@ -214,86 +249,52 @@ export function StudioHeader() {
           </Tooltip>
         </div>
 
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
+
+        <Tooltip label="Disposition automatique" shortcut="A">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAutoLayout}
+            className="shrink-0"
+          >
+            <LayoutGrid className="size-4" />
+            <span className="hidden lg:inline">Disposition</span>
+          </Button>
+        </Tooltip>
+        {/* Smart-join : scanne le schéma et connecte les relations orphelines (annulable). */}
+        <Tooltip label="Auto-détecter les relations (annulable)" side="bottom">
+          <Button size="sm" variant="outline" onClick={handleAutoDetect} className="shrink-0">
+            <Wand2 className="size-4" />
+            <span className="hidden lg:inline">Auto-détecter</span>
+          </Button>
+        </Tooltip>
+
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
+
         <HealthPill
           onOpenIssues={() => setIssuesOpen(true)}
           onNormalize={handleNormalize}
         />
+      </div>
 
-        {/* Grouped file / schema actions — collapses to a single menu so the
-            topbar never overflows on narrow viewports. */}
-        <Menu.Root>
-          <Menu.Trigger
-            aria-label="Actions du fichier"
-            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-popup-open:bg-muted"
-          >
-            <MoreHorizontal className="size-4" />
-          </Menu.Trigger>
-          <Menu.Portal>
-            <Menu.Positioner side="bottom" align="end" sideOffset={6} className="z-50">
-              <Menu.Popup className="glass-panel min-w-44 rounded-xl p-1 shadow-xl ring-1 ring-foreground/10 backdrop-blur-md">
-                <Menu.Item className={menuItemClass} onClick={handleAutoDetect}>
-                  <Wand2 className="size-4" />
-                  Auto-détecter les relations
-                </Menu.Item>
-                <Menu.Item className={menuItemClass} onClick={() => openFileAction("import")}>
-                  Importer
-                </Menu.Item>
-                <Menu.Item className={menuItemClass} onClick={() => openFileAction("templates")}>
-                  Modèles
-                </Menu.Item>
-                <Menu.Item className={menuItemClass} onClick={() => openFileAction("export")}>
-                  Exporter
-                </Menu.Item>
-                <Menu.Item
-                  className={cn(menuItemClass, "text-destructive data-highlighted:bg-destructive/10")}
-                  onClick={() => openFileAction("reset")}
-                >
-                  Effacer
-                </Menu.Item>
-              </Menu.Popup>
-            </Menu.Positioner>
-          </Menu.Portal>
-        </Menu.Root>
-
-        <span className="hidden xl:inline-flex">
-          <Tooltip label="Disposition automatique" shortcut="A">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleAutoLayout}
-            >
-              <LayoutGrid className="size-4" />
-              Disposition
-            </Button>
-          </Tooltip>
-        </span>
-        {/* Smart-join: scan the schema and auto-wire orphan relations (undoable). */}
-        <Tooltip label="Auto-détecter les relations (annulable)" side="bottom">
-          <Button size="sm" variant="outline" onClick={handleAutoDetect}>
-            <Wand2 className="size-4" />
-            Auto-détecter
-          </Button>
-        </Tooltip>
-        {/* Quick-access Templates (moved from sidebar): undoable + toast. */}
-        <Tooltip label="Modèles — Démarrage & Presets (annulable)" side="bottom">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => openFileAction("templates")}
-          >
-            <LayoutTemplate className="size-4" />
-            Modèles
-          </Button>
-        </Tooltip>
+      {/* ── Zone droite : code + collaboration + utilitaires ── */}
+      <div className="flex shrink-0 items-center gap-2">
         <Button
           size="sm"
           variant="default"
           nativeButton={false}
           render={<Link href="/studio/code" />}
+          className="shrink-0"
         >
           <Code2 className="size-4" />
-          Studio de Code
+          <span className="hidden md:inline">Studio de Code</span>
         </Button>
+
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
+
+        {/* Présence live + partage (avatars, activité, bouton Partager). */}
+        <CollabToolbar />
 
         <Tooltip label="Palette de commandes" shortcut="mod+k" side="bottom">
           <Button
@@ -310,20 +311,6 @@ export function StudioHeader() {
             <Search className="size-4" />
           </Button>
         </Tooltip>
-
-        <Tooltip label="Revue collaborative — curseurs temps réel" side="bottom">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            onClick={() => window.dispatchEvent(new CustomEvent("archstudio:toggle-collab"))}
-            aria-label="Basculer la revue collaborative"
-          >
-            <Users className="size-4" />
-          </Button>
-        </Tooltip>
-
-        <CollabToolbar />
 
         <Tooltip label="Focus Graphe — plein écran canvas" shortcut="shift+z" side="bottom">
           <Button

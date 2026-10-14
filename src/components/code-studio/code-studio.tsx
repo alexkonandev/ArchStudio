@@ -8,10 +8,13 @@ import {
   Copy,
   Download,
   FileDown,
-  LayoutGrid,
   Maximize2,
   Minimize2,
+  RotateCcw,
+  Wand2,
+  X,
 } from "lucide-react";
+import type { editor } from "monaco-editor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -22,40 +25,59 @@ import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import {
   analyzeRobustness,
   computeStats,
-  generateCodeFiles,
   SQL_DIALECTS,
-  type CodeFile,
   type SqlDialect,
 } from "@/lib/engine/codegen";
+import { computeHealthScore } from "@/lib/engine/health-score";
 import { downloadTextFile } from "@/lib/export/image";
 import { useGraphStore } from "@/store/graph-store";
+import {
+  useCodeWorkspaceStore,
+  type WorkspaceFile,
+} from "@/store/code-workspace-store";
 import { useGlobalHistoryShortcuts } from "@/hooks/use-global-history-shortcuts";
-import { CodeEditor } from "./code-editor";
+import { MonacoCodeEditor } from "./monaco-code-editor";
 import { FileTree } from "./file-tree";
 import { DiagnosticsPanel } from "./diagnostics-panel";
 
+
 /**
- * Full-screen "Code Studio": a 3-column IDE-style workspace over the graph AST.
- * - Left: virtual file tree (Prisma / SQL dialects / TS / Zod / report).
- * - Center: format tabs + read-only code editor with line numbers.
- * - Right: live diagnostics & robustness analysis.
+ * Full-screen "Code Studio": a modular, VS Code-inspired IDE over the graph AST.
+ * - Left: folder-structured virtual file explorer (Prisma / SQL / Types / Docs).
+ * - Center: editor tab strip + Monaco editor + quick actions (copy / format /
+ *   download / revert).
+ * - Right: interactive diagnostics wired to the Health Score and schema errors.
  *
- * Code generation is gated behind this view and fed a deferred AST so rapid
- * canvas edits stay responsive.
+ * Code generation is gated behind this view. The graph AST is derived with a
+ * deferred value so rapid canvas edits stay responsive, and pushed into the
+ * dedicated {@link useCodeWorkspaceStore} VFS (which preserves manual edits on
+ * dirty files across regenerations).
  */
 export function CodeStudio() {
   const tables = useGraphStore((s) => s.tables);
   const relations = useGraphStore((s) => s.relations);
   const enums = useGraphStore((s) => s.enums);
+  const validationIssues = useGraphStore((s) => s.validationIssues);
   const getSchemaAst = useGraphStore((s) => s.getSchemaAst);
   const selectNode = useGraphStore((s) => s.selectNode);
   const router = useRouter();
 
-  const [activeId, setActiveId] = useState("prisma");
+  // VFS store — the single source of truth for the editor's files & tabs.
+  const files = useCodeWorkspaceStore((s) => s.files);
+  const openTabIds = useCodeWorkspaceStore((s) => s.openTabIds);
+  const activeFileId = useCodeWorkspaceStore((s) => s.activeFileId);
+  const syncFiles = useCodeWorkspaceStore((s) => s.syncFiles);
+  const openFile = useCodeWorkspaceStore((s) => s.openFile);
+  const closeTab = useCodeWorkspaceStore((s) => s.closeTab);
+  const updateFileContent = useCodeWorkspaceStore((s) => s.updateFileContent);
+  const revertFile = useCodeWorkspaceStore((s) => s.revertFile);
+
   const [copied, setCopied] = useState(false);
   const [sqlDialect, setSqlDialect] = useState<SqlDialect>("postgresql");
   const [hoverTableId, setHoverTableId] = useState<string | null>(null);
+  const [revealLine, setRevealLine] = useState<number | undefined>(undefined);
   const [zen, setZen] = useState(false);
+  const editorInstanceRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useGlobalHistoryShortcuts();
 
@@ -119,38 +141,67 @@ export function CodeStudio() {
   );
   const deferredAst = useDeferredValue(ast);
 
-  const files = useMemo(() => generateCodeFiles(deferredAst), [deferredAst]);
+  // Push the (deferred) AST into the VFS store. The store reconciles the file
+  // set, preserving manual edits on dirty files, so we only feed it data.
+  useEffect(() => {
+    syncFiles(deferredAst);
+  }, [deferredAst, syncFiles]);
+
   const stats = useMemo(() => computeStats(deferredAst), [deferredAst]);
   const alerts = useMemo(() => analyzeRobustness(deferredAst), [deferredAst]);
+  const health = useMemo(
+    () => computeHealthScore(tables, relations, validationIssues),
+    [tables, relations, validationIssues],
+  );
 
-  const activeFile: CodeFile | undefined =
-    files.find((f) => f.id === activeId) ?? files[0];
+  const activeFile: WorkspaceFile | undefined =
+    files.find((f) => f.id === activeFileId) ?? files[0];
 
-  // Lines to highlight: when hovering an alert row, find the table's block in
-  // the active file (Prisma `model X {` or SQL `CREATE TABLE X (`).
+  // Files currently open in the tab strip, resolved from the VFS.
+  const openFiles = useMemo(
+    () =>
+      openTabIds
+        .map((id) => files.find((f) => f.id === id))
+        .filter((f): f is WorkspaceFile => f !== undefined),
+    [openTabIds, files],
+  );
+
+  // Locate a table's block in a file: Prisma `model X {` or SQL `CREATE TABLE X`.
+  const findTableLines = useCallback(
+    (tableName: string, content: string): number[] => {
+      const lines = content.split("\n");
+      const found: number[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (
+          lines[i].includes(`model ${tableName} {`) ||
+          (lines[i].includes("CREATE TABLE") && lines[i].includes(`"${tableName}"`)) ||
+          (lines[i].includes("CREATE TABLE") && lines[i].includes(`\`${tableName}\``))
+        ) {
+          found.push(i + 1);
+        }
+      }
+      return found;
+    },
+    [],
+  );
+
+  // Lines to highlight: when hovering a diagnostic row, find the table's block
+  // in the active file so Monaco can paint a whole-line decoration.
   const highlightLines = useMemo(() => {
     if (!hoverTableId || !activeFile) return [];
     const table = tables.find((t) => t.id === hoverTableId);
     if (!table) return [];
-    const lines = activeFile.content.split("\n");
-    const found: number[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      if (
-        lines[i].includes(`model ${table.name} {`) ||
-        lines[i].includes(`CREATE TABLE`) && lines[i].includes(`"${table.name}"`) ||
-        lines[i].includes(`CREATE TABLE`) && lines[i].includes(`\`${table.name}\``)
-      ) {
-        found.push(i + 1);
-      }
-    }
-    return found;
-  }, [hoverTableId, activeFile, tables]);
+    return findTableLines(table.name, activeFile.content);
+  }, [hoverTableId, activeFile, tables, findTableLines]);
 
-  // Select a SQL dialect: switch active file + keep dialect in sync.
-  const handleSelectDialect = useCallback((dialect: SqlDialect) => {
-    setSqlDialect(dialect);
-    setActiveId(`sql-${dialect}`);
-  }, []);
+  // Select a SQL dialect: open the matching dialect file + keep state in sync.
+  const handleSelectDialect = useCallback(
+    (dialect: SqlDialect) => {
+      setSqlDialect(dialect);
+      openFile(`sql-${dialect}`);
+    },
+    [openFile],
+  );
 
   const handleCopy = useCallback(() => {
     if (!activeFile) return;
@@ -166,6 +217,23 @@ export function CodeStudio() {
         }, 2000);
       });
   }, [activeFile]);
+
+  // "Format": run Monaco's built-in document formatter on the active model.
+  const handleFormat = useCallback(() => {
+    const instance = editorInstanceRef.current;
+    if (!instance) return;
+    void instance.getAction("editor.action.formatDocument")?.run();
+  }, []);
+
+  // "Revert": discard manual edits, restoring the generated baseline.
+  const handleRevert = useCallback(() => {
+    if (!activeFile?.dirty) return;
+    revertFile(activeFile.id);
+    pushToast("Modifications annulées", {
+      type: "info",
+      description: `${activeFile.filename} restauré depuis le schéma.`,
+    });
+  }, [activeFile, revertFile]);
 
   const handleDownloadSingle = useCallback(() => {
     if (!activeFile) return;
@@ -194,8 +262,23 @@ export function CodeStudio() {
     [selectNode, router],
   );
 
-  const errorCount = alerts.filter((a) => a.severity === "error").length;
-  const warningCount = alerts.filter((a) => a.severity === "warning").length;
+  // Diagnostics → editor: reveal the table's first matching line in Monaco.
+  const handleRevealTable = useCallback(
+    (tableId: string) => {
+      if (!activeFile) return;
+      const table = tables.find((t) => t.id === tableId);
+      if (!table) return;
+      const line = findTableLines(table.name, activeFile.content)[0];
+      if (line) setRevealLine(line);
+    },
+    [activeFile, tables, findTableLines],
+  );
+
+  const handleEditorReady = useCallback((instance: editor.IStandaloneCodeEditor) => {
+    editorInstanceRef.current = instance;
+  }, []);
+
+  const dirtyCount = files.reduce((count, f) => count + (f.dirty ? 1 : 0), 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -244,15 +327,32 @@ export function CodeStudio() {
           <span
             className={cn(
               "size-2 rounded-full",
-              errorCount > 0
+              health.errorCount > 0
                 ? "bg-destructive"
-                : warningCount > 0
+                : health.warningCount > 0
                   ? "bg-amber-500"
                   : "bg-emerald-500",
             )}
+            aria-label={`Santé du schéma : ${health.score}%`}
           />
-          <Badge variant="secondary">{files.length} fichier{files.length === 1 ? "" : "s"}</Badge>
+          <Badge variant="secondary">
+            {health.score}% · {files.length} fichier{files.length === 1 ? "" : "s"}
+          </Badge>
+          {dirtyCount > 0 && (
+            <Tooltip label="Fichiers modifiés manuellement — cliquez pour tout restaurer">
+              <Button size="sm" variant="outline" onClick={handleRevert}>
+                <RotateCcw className="size-4" />
+                {dirtyCount} modifié{dirtyCount === 1 ? "" : "s"}
+              </Button>
+            </Tooltip>
+          )}
 
+          <Tooltip label="Formater le document" shortcut="mod+shift+i">
+            <Button size="sm" variant="outline" onClick={handleFormat}>
+              <Wand2 className="size-4" />
+              Formater
+            </Button>
+          </Tooltip>
           <Tooltip label="Copier dans le presse-papiers">
             <Button size="sm" variant="outline" onClick={handleCopy}>
               {copied ? (
@@ -307,32 +407,57 @@ export function CodeStudio() {
         </div>
       </div>
 
-      {/* Format tabs */}
+      {/* Editor tab strip (VS Code-style) */}
       {!zen && (
-      <div className="glass-panel flex shrink-0 items-center gap-1 overflow-x-auto border-b px-2 py-1.5 backdrop-blur-md">
-        <LayoutGrid className="mr-1 size-3.5 shrink-0 text-muted-foreground" />
-        {files.map((file) => {
-          const active = file.id === activeFile?.id;
-          return (
-            <button
-              key={file.id}
-              type="button"
-              onClick={() => setActiveId(file.id)}
-              className={cn(
-                "shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                active
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {file.label}
-            </button>
-          );
-        })}
-      </div>
+        <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border bg-muted px-1.5 py-1">
+          {openFiles.length === 0 ? (
+            <span className="px-2 py-1 text-xs text-muted-foreground">
+              Ouvrez un fichier depuis l&apos;explorateur →
+            </span>
+          ) : (
+            openFiles.map((file) => {
+              const active = file.id === activeFile?.id;
+              return (
+                <div
+                  key={file.id}
+                  className={cn(
+                    "group/tab flex shrink-0 items-center gap-1.5 rounded-t-md border-t-2 px-2.5 py-1.5 text-xs transition-colors",
+                    active
+                      ? "border-t-primary bg-background text-foreground"
+                      : "border-t-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => openFile(file.id)}
+                    className="flex items-center gap-1.5 font-mono"
+                    aria-current={active ? "true" : undefined}
+                  >
+                    {file.filename}
+                    {file.dirty && (
+                      <span
+                        aria-hidden
+                        title="Modifié"
+                        className="size-1.5 rounded-full bg-amber-400"
+                      />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => closeTab(file.id)}
+                    aria-label={`Fermer ${file.filename}`}
+                    className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover/tab:opacity-100 hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
       )}
 
-      {/* 3 columns */}
+      {/* 3 columns: explorer | editor | diagnostics */}
       <div className="flex min-h-0 flex-1">
         {!zen && (
           <>
@@ -340,7 +465,12 @@ export function CodeStudio() {
               className="glass-panel shrink-0 overflow-hidden border-r backdrop-blur-md"
               style={{ width: fileTreePanel.width }}
             >
-              <FileTree files={files} activeId={activeFile?.id ?? ""} onSelect={setActiveId} />
+              <FileTree
+                files={files}
+                activeId={activeFile?.id ?? null}
+                openIds={openTabIds}
+                onSelect={openFile}
+              />
             </aside>
             <ResizeHandle
               side="right"
@@ -352,12 +482,23 @@ export function CodeStudio() {
 
         <main className={cn("min-w-0 flex-1", !zen && "p-3", zen && "p-6")}>
           {activeFile ? (
-            <CodeEditor
-              content={activeFile.content}
-              language={activeFile.language}
-              highlightLines={highlightLines}
-            />
-          ) : null}
+            <div className="h-full overflow-hidden rounded-lg border border-border shadow-sm">
+              <MonacoCodeEditor
+                key={activeFile.id}
+                value={activeFile.content}
+                language={activeFile.language}
+                path={`file:///workspace/${activeFile.filename}`}
+                onChange={(next) => updateFileContent(activeFile.id, next)}
+                highlightLines={highlightLines}
+                revealLine={revealLine}
+                onReady={handleEditorReady}
+              />
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+              Sélectionnez un fichier dans l&apos;explorateur pour l&apos;ouvrir.
+            </div>
+          )}
         </main>
 
         {!zen && (
@@ -373,8 +514,11 @@ export function CodeStudio() {
             >
               <DiagnosticsPanel
                 stats={stats}
+                health={health}
+                issues={validationIssues}
                 alerts={alerts}
                 onGoToTable={handleGoToTable}
+                onRevealTable={handleRevealTable}
                 onHoverTable={setHoverTableId}
               />
             </aside>

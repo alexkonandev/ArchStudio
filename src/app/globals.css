@@ -357,3 +357,13 @@
     animation: none;
   }
 }
+
+/*
+ * Monaco whole-line highlight: a soft amber wash behind a line when the
+ * diagnostics panel hovers a table (applied via editor decorations, so the
+ * theme owns the token colours and this only tints the background).
+ */
+.archstudio-highlight-line {
+  background-color: rgb(251 191 36 / 0.14);
+  box-shadow: inset 2px 0 0 0 rgb(251 191 36 / 0.6);
+}

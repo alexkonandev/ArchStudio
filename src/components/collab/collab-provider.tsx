@@ -62,7 +62,7 @@ export function CollabProvider({ roomId }: { roomId: string }) {
       announcedRef.current = true;
       pushToast("Session collaborative active", {
         type: "success",
-        description: "Ouvrez ArchStudio dans un 2ᵉ onglet pour tester le multi-utilisateur.",
+        description: "Ouvrez Modelizia dans un 2ᵉ onglet pour tester le multi-utilisateur.",
       });
     }
     if (!connected) announcedRef.current = false;
