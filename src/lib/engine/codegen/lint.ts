@@ -89,6 +89,18 @@ export function analyzeRobustness(ast: SchemaAst): RobustnessAlert[] {
       }
     }
 
+    // Relation without an explicit ON DELETE behavior (falls back to the
+    // database / Prisma default, which can silently orphan or block rows).
+    if (!rel.onDelete) {
+      alerts.push({
+        id: `no-ondelete:${rel.id}`,
+        severity: "info",
+        title: "Relation sans contrainte ON DELETE",
+        message: `La relation ${from.name} → ${to.name} n'a pas de comportement ON DELETE explicite. Prisma appliquera la valeur par défaut de la base ; précisez-la pour éviter les suppressions orphelines ou bloquantes.`,
+        tableId: rel.fromTableId,
+      });
+    }
+
     // Many-to-many without an explicit join table.
     if (rel.type === "many-to-many" && !hasJoinTable(ast, from, to)) {
       alerts.push({

@@ -21,15 +21,15 @@ const SEVERITY_STYLES: Record<
   RobustnessAlert["severity"],
   { ring: string; icon: typeof Table2; label: string }
 > = {
-  error: { ring: "border-destructive/40 bg-destructive/10", icon: OctagonAlert, label: "Erreur" },
-  warning: { ring: "border-amber-500/40 bg-amber-500/10", icon: TriangleAlert, label: "Avertissement" },
-  info: { ring: "border-border bg-muted/40", icon: ShieldCheck, label: "Info" },
+  error: { ring: "border-rose-200 bg-rose-50", icon: OctagonAlert, label: "Erreur" },
+  warning: { ring: "border-amber-200 bg-amber-50", icon: TriangleAlert, label: "Avertissement" },
+  info: { ring: "border-slate-200 bg-slate-50", icon: ShieldCheck, label: "Info" },
 };
 
 const SEVERITY_ICON_COLOR: Record<RobustnessAlert["severity"], string> = {
-  error: "text-destructive",
+  error: "text-rose-500",
   warning: "text-amber-500",
-  info: "text-muted-foreground",
+  info: "text-slate-400",
 };
 
 /** Progress-bar + rank tone keyed by score band (mirrors the canvas widget). */
@@ -71,27 +71,20 @@ export function DiagnosticsPanel({
   const tone = scoreTone(health.score);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-border p-4">
-        <h2 className="text-sm font-semibold">Diagnostics</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Santé du schéma et contrôles de robustesse en direct.
-        </p>
-      </div>
-
+    <div className="flex h-full flex-col overflow-hidden bg-white">
       {/* Health Score — mirrors the gamified canvas widget. */}
-      <div className="border-b border-border p-4">
+      <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className={cn("size-4", tone.text)} />
-            <span className="text-xs font-medium">Santé du schéma</span>
+            <span className="text-xs font-medium text-slate-800">Santé du schéma</span>
           </div>
           <span className={cn("text-lg leading-none font-bold tabular-nums", tone.text)}>
             {health.score}%
           </span>
         </div>
         <div
-          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
           role="progressbar"
           aria-valuenow={health.score}
           aria-valuemin={0}
@@ -118,8 +111,8 @@ export function DiagnosticsPanel({
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 border-b border-border p-4">
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 gap-2 border-b border-slate-200 p-4">
         <Stat icon={Table2} label="Tables" value={stats.tables} />
         <Stat icon={GitBranch} label="Relations" value={stats.relations} />
         <Stat icon={KeyRound} label="Champs" value={stats.fields} />
@@ -128,13 +121,13 @@ export function DiagnosticsPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Schema integrity issues (graph errors + warnings). */}
-        <div className="border-b border-border p-3">
-          <p className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+        <div className="border-b border-slate-200 p-3">
+          <p className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
             Intégrité du graphe
           </p>
           {issues.length === 0 ? (
-            <p className="rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
-              Aucune erreur d&apos;intégrité. Le graphe est sain. 🎉
+            <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-500">
+              Aucune erreur d'intégrité. Le graphe est sain. 🎉
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -146,30 +139,30 @@ export function DiagnosticsPanel({
                     onMouseEnter={() => onHoverTable?.(issue.target.tableId ?? null)}
                     onMouseLeave={() => onHoverTable?.(null)}
                     className={cn(
-                      "cursor-pointer rounded-lg border p-2.5 text-xs transition-colors hover:ring-2 hover:ring-ring/40",
+                      "cursor-pointer rounded-lg border p-2.5 text-xs transition-shadow hover:shadow-sm",
                       isError
-                        ? "border-destructive/40 bg-destructive/10"
-                        : "border-amber-500/40 bg-amber-500/10",
+                        ? "border-rose-200 bg-rose-50 hover:ring-2 hover:ring-rose-300"
+                        : "border-amber-200 bg-amber-50 hover:ring-2 hover:ring-amber-300",
                     )}
                   >
                     <div className="flex items-center gap-2">
                       {isError ? (
-                        <OctagonAlert className="size-4 shrink-0 text-destructive" />
+                        <OctagonAlert className="size-4 shrink-0 text-rose-500" />
                       ) : (
                         <TriangleAlert className="size-4 shrink-0 text-amber-500" />
                       )}
-                      <span className="ml-auto text-[10px] text-muted-foreground">
+                      <span className="ml-auto text-[10px] text-slate-500">
                         {isError ? "Erreur" : "Avertissement"}
                       </span>
                     </div>
-                    <p className="mt-1.5 leading-relaxed text-muted-foreground">{issue.message}</p>
+                    <p className="mt-1.5 leading-relaxed text-slate-500">{issue.message}</p>
                     <div className="mt-2 flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="xs"
                         onClick={() => onRevealTable(issue.target.tableId)}
                       >
-                        Voir dans l&apos;éditeur
+                        Voir dans l'éditeur
                       </Button>
                       <Button
                         variant="ghost"
@@ -188,12 +181,12 @@ export function DiagnosticsPanel({
 
         {/* Robustesse */}
         <div className="p-3">
-          <p className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+          <p className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-slate-500 uppercase">
             Robustesse
           </p>
 
         {alerts.length === 0 ? (
-          <p className="rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-500">
             Aucun problème de robustesse détecté.
           </p>
         ) : (
@@ -215,20 +208,20 @@ export function DiagnosticsPanel({
                 >
                   <div className="flex items-center gap-2">
                     <Icon className={cn("size-4 shrink-0", SEVERITY_ICON_COLOR[alert.severity])} />
-                    <span className="font-medium">{alert.title}</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">
+                    <span className="font-medium text-slate-800">{alert.title}</span>
+                    <span className="ml-auto text-[10px] text-slate-500">
                       {style.label}
                     </span>
                   </div>
-                  <p className="mt-1.5 leading-relaxed text-muted-foreground">{alert.message}</p>
+                  <p className="mt-1.5 leading-relaxed text-slate-500">{alert.message}</p>
                   {alert.tableId && (
                     <Button
                       variant="outline"
                       size="xs"
                       className="mt-2"
-                      onClick={() => onGoToTable(alert.tableId as string)}
+                      onClick={() => onRevealTable(alert.tableId as string)}
                     >
-                      Aller à la table
+                      Aller à la ligne
                     </Button>
                   )}
                 </li>
@@ -252,11 +245,11 @@ function Stat({
   value: number;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-2">
-      <Icon className="size-4 text-muted-foreground" />
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2">
+      <Icon className="size-4 text-slate-500" />
       <div className="min-w-0">
-        <p className="text-lg leading-none font-semibold tabular-nums">{value}</p>
-        <p className="text-[10px] text-muted-foreground">{label}</p>
+        <p className="text-lg leading-none font-semibold tabular-nums text-slate-800">{value}</p>
+        <p className="text-[10px] text-slate-500">{label}</p>
       </div>
     </div>
   );

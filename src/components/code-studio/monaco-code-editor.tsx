@@ -70,8 +70,6 @@ export interface MonacoCodeEditorProps {
   onChange: (value: string) => void;
   /** 1-based line numbers to emphasise (e.g. the hovered diagnostic's table). */
   highlightLines?: number[];
-  /** When it changes, scroll this 1-based line into the centre. */
-  revealLine?: number;
   /** Disable editing (read-only preview). */
   readOnly?: boolean;
   /** Receives the live editor instance so the shell can trigger "format". */
@@ -160,8 +158,8 @@ const HIGHLIGHT_CLASS = "archstudio-highlight-line";
 /**
  * Controlled Monaco surface for a single VFS file. The editor instance is
  * captured on mount (exposed to the shell via {@link MonacoCodeEditorProps.onReady}
- * for the "format" action) and reused to apply highlight decorations + reveal
- * lines driven by the diagnostics panel.
+ * for the "format" action and for store-driven line reveals) and reused to apply
+ * highlight decorations when a diagnostic row is hovered.
  */
 export function MonacoCodeEditor({
   value,
@@ -169,7 +167,6 @@ export function MonacoCodeEditor({
   path,
   onChange,
   highlightLines,
-  revealLine,
   readOnly = false,
   onReady,
   className,
@@ -220,14 +217,6 @@ export function MonacoCodeEditor({
       })),
     );
   }, [highlightLines, value]);
-
-  // Reveal a specific line when the diagnostics panel requests it.
-  useEffect(() => {
-    const instance = editorRef.current;
-    if (!instance || !revealLine) return;
-    instance.revealLineInCenter(revealLine);
-    instance.setPosition({ lineNumber: revealLine, column: 1 });
-  }, [revealLine]);
 
   return (
     <MonacoReact

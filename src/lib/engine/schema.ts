@@ -89,7 +89,7 @@ export const storedSchemaSchema = z.object({
   datasource: z
     .object({
       provider: z
-        .enum(["postgresql", "mysql", "sqlite"])
+        .enum(["postgresql", "mysql", "sqlite", "cockroachdb", "sqlserver"])
         .catch("postgresql"),
       urlEnv: z.string().optional(),
     })

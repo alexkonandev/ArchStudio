@@ -2,7 +2,12 @@ import type { EnumDef, Relation, Table } from "./database";
 
 export type SchemaAstVersion = 1;
 
-export type DatabaseProvider = "postgresql" | "mysql" | "sqlite";
+export type DatabaseProvider =
+  | "postgresql"
+  | "mysql"
+  | "sqlite"
+  | "cockroachdb"
+  | "sqlserver";
 
 /**
  * Serializable snapshot of the whole graph — the input of the codegen

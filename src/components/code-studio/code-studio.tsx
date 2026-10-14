@@ -29,6 +29,7 @@ import {
   type SqlDialect,
 } from "@/lib/engine/codegen";
 import { computeHealthScore } from "@/lib/engine/health-score";
+import { parseOutline } from "@/lib/engine/outline";
 import { downloadTextFile } from "@/lib/export/image";
 import { useGraphStore } from "@/store/graph-store";
 import {
@@ -38,7 +39,7 @@ import {
 import { useGlobalHistoryShortcuts } from "@/hooks/use-global-history-shortcuts";
 import { MonacoCodeEditor } from "./monaco-code-editor";
 import { FileTree } from "./file-tree";
-import { DiagnosticsPanel } from "./diagnostics-panel";
+import { RightSidebar } from "./right-sidebar";
 
 
 /**
@@ -72,10 +73,19 @@ export function CodeStudio() {
   const updateFileContent = useCodeWorkspaceStore((s) => s.updateFileContent);
   const revertFile = useCodeWorkspaceStore((s) => s.revertFile);
 
+  // Modular right sidebar state (active tab, outline symbols, reveal bus, config).
+  const activeRightSidebarTab = useCodeWorkspaceStore((s) => s.activeRightSidebarTab);
+  const setActiveRightSidebarTab = useCodeWorkspaceStore((s) => s.setActiveRightSidebarTab);
+  const parsedSymbols = useCodeWorkspaceStore((s) => s.parsedSymbols);
+  const setParsedSymbols = useCodeWorkspaceStore((s) => s.setParsedSymbols);
+  const revealRequest = useCodeWorkspaceStore((s) => s.revealRequest);
+  const requestRevealLine = useCodeWorkspaceStore((s) => s.requestRevealLine);
+  const codegenOptions = useCodeWorkspaceStore((s) => s.codegenOptions);
+  const updateCodegenOptions = useCodeWorkspaceStore((s) => s.updateCodegenOptions);
+
   const [copied, setCopied] = useState(false);
   const [sqlDialect, setSqlDialect] = useState<SqlDialect>("postgresql");
   const [hoverTableId, setHoverTableId] = useState<string | null>(null);
-  const [revealLine, setRevealLine] = useState<number | undefined>(undefined);
   const [zen, setZen] = useState(false);
   const editorInstanceRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,9 +99,9 @@ export function CodeStudio() {
     side: "right",
   });
   const diagnosticsPanel = useResizablePanel({
-    storageKey: "archstudio:panel-width:studio-diagnostics",
-    defaultWidth: 320,
-    minWidth: 240,
+    storageKey: "archstudio:panel-width:studio-sidebar",
+    defaultWidth: 384,
+    minWidth: 280,
     maxWidth: 520,
     side: "left",
   });
@@ -142,10 +152,12 @@ export function CodeStudio() {
   const deferredAst = useDeferredValue(ast);
 
   // Push the (deferred) AST into the VFS store. The store reconciles the file
-  // set, preserving manual edits on dirty files, so we only feed it data.
+  // set, preserving manual edits on dirty files, so we only feed it data. It
+  // also re-runs whenever the codegen options change (provider / urlEnv / file
+  // toggles) so a Config edit regenerates the VFS immediately.
   useEffect(() => {
     syncFiles(deferredAst);
-  }, [deferredAst, syncFiles]);
+  }, [deferredAst, syncFiles, codegenOptions]);
 
   const stats = useMemo(() => computeStats(deferredAst), [deferredAst]);
   const alerts = useMemo(() => analyzeRobustness(deferredAst), [deferredAst]);
@@ -193,6 +205,27 @@ export function CodeStudio() {
     if (!table) return [];
     return findTableLines(table.name, activeFile.content);
   }, [hoverTableId, activeFile, tables, findTableLines]);
+
+  // Outline: re-parse the active file whenever its content or language changes,
+  // so the symbol tree tracks manual Monaco edits instantly.
+  useEffect(() => {
+    if (!activeFile) {
+      setParsedSymbols([]);
+      return;
+    }
+    setParsedSymbols(parseOutline(activeFile.content, activeFile.language));
+  }, [activeFile, setParsedSymbols]);
+
+  // Reveal bus: when the Outline/Diagnostics panel requests a line, scroll the
+  // live Monaco instance to it and place the cursor. The nonce lets the same
+  // line be re-requested (e.g. clicking the same symbol twice).
+  useEffect(() => {
+    const instance = editorInstanceRef.current;
+    if (!instance || !revealRequest) return;
+    instance.revealLineInCenter(revealRequest.line);
+    instance.setPosition({ lineNumber: revealRequest.line, column: 1 });
+    instance.focus();
+  }, [revealRequest]);
 
   // Select a SQL dialect: open the matching dialect file + keep state in sync.
   const handleSelectDialect = useCallback(
@@ -269,14 +302,22 @@ export function CodeStudio() {
       const table = tables.find((t) => t.id === tableId);
       if (!table) return;
       const line = findTableLines(table.name, activeFile.content)[0];
-      if (line) setRevealLine(line);
+      if (line) requestRevealLine(line);
     },
-    [activeFile, tables, findTableLines],
+    [activeFile, tables, findTableLines, requestRevealLine],
   );
 
-  const handleEditorReady = useCallback((instance: editor.IStandaloneCodeEditor) => {
-    editorInstanceRef.current = instance;
-  }, []);
+  const handleEditorReady = useCallback(
+    (instance: editor.IStandaloneCodeEditor) => {
+      editorInstanceRef.current = instance;
+      // Auto-format on regeneration: when the option is on, run the built-in
+      // formatter each time a freshly generated document mounts.
+      if (codegenOptions.autoFormatOnSave) {
+        void instance.getAction("editor.action.formatDocument")?.run();
+      }
+    },
+    [codegenOptions.autoFormatOnSave],
+  );
 
   const dirtyCount = files.reduce((count, f) => count + (f.dirty ? 1 : 0), 0);
 
@@ -490,7 +531,6 @@ export function CodeStudio() {
                 path={`file:///workspace/${activeFile.filename}`}
                 onChange={(next) => updateFileContent(activeFile.id, next)}
                 highlightLines={highlightLines}
-                revealLine={revealLine}
                 onReady={handleEditorReady}
               />
             </div>
@@ -505,21 +545,29 @@ export function CodeStudio() {
           <>
             <ResizeHandle
               side="left"
-              label="Redimensionner les diagnostics"
+              label="Redimensionner le panneau latéral"
               {...diagnosticsPanel.handleProps}
             />
             <aside
               className="glass-panel shrink-0 overflow-hidden border-l backdrop-blur-md"
               style={{ width: diagnosticsPanel.width }}
             >
-              <DiagnosticsPanel
-                stats={stats}
-                health={health}
-                issues={validationIssues}
-                alerts={alerts}
-                onGoToTable={handleGoToTable}
-                onRevealTable={handleRevealTable}
-                onHoverTable={setHoverTableId}
+              <RightSidebar
+                activeTab={activeRightSidebarTab}
+                onTabChange={setActiveRightSidebarTab}
+                symbols={parsedSymbols}
+                onRevealLine={requestRevealLine}
+                codegenOptions={codegenOptions}
+                onCodegenChange={updateCodegenOptions}
+                diagnostics={{
+                  stats,
+                  health,
+                  issues: validationIssues,
+                  alerts,
+                  onGoToTable: handleGoToTable,
+                  onRevealTable: handleRevealTable,
+                  onHoverTable: setHoverTableId,
+                }}
               />
             </aside>
           </>

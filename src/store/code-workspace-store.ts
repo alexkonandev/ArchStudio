@@ -1,13 +1,34 @@
 "use client";
 
 import { create } from "zustand";
-import type { SchemaAst } from "@/types";
+import type { DatabaseProvider, SchemaAst } from "@/types";
 import {
   generateCodeFiles,
   type CodeFile,
   type CodeFileKind,
   type SqlDialect,
 } from "@/lib/engine/codegen";
+import type { OutlineSymbol } from "@/lib/engine/outline";
+
+/** Active tab of the modular right sidebar. */
+export type RightSidebarTab = "outline" | "config" | "diagnostics";
+
+/**
+ * Global code-generation configuration, editable from the "Config" tab. Any
+ * change is immediately reflected in the regenerated VFS (see `syncFiles`).
+ */
+export interface CodegenOptions {
+  /** Prisma datasource provider (also drives the SQL dialect family). */
+  provider: DatabaseProvider;
+  /** Name of the env var holding the connection URL (`env("…")` in Prisma). */
+  urlEnv: string;
+  /** Whether the Zod schemas virtual file is generated. */
+  includeZod: boolean;
+  /** Whether the TypeScript interfaces virtual file is generated. */
+  includeTypeScript: boolean;
+  /** Format the active document whenever the schema regenerates. */
+  autoFormatOnSave: boolean;
+}
 
 /**
  * Editor language hint for a {@link WorkspaceFile}. Mirrors {@link CodeFile}'s
@@ -53,10 +74,24 @@ export interface CodeWorkspaceState {
   /** The active (visible) file id, or null when nothing is open. */
   activeFileId: string | null;
 
+  /** Active tab of the modular right sidebar (Outline / Config / Diagnostics). */
+  activeRightSidebarTab: RightSidebarTab;
+  /** Symbols parsed from the active file, feeding the Outline tab. */
+  parsedSymbols: OutlineSymbol[];
+  /**
+   * Line Monaco should scroll to, plus a monotonic nonce so re-requesting the
+   * same line still fires a fresh reveal (a bare number wouldn't re-trigger).
+   */
+  revealRequest: { line: number; nonce: number } | null;
+  /** Global code-generation config, editable from the Config tab. */
+  codegenOptions: CodegenOptions;
+
   /**
    * Regenerate the VFS from a graph AST. Clean files are refreshed in place;
    * dirty files keep their user edits but get an updated baseline. Tabs and
-   * the active file are reconciled against the new file set.
+   * the active file are reconciled against the new file set. The datasource
+   * (provider + urlEnv) and the Zod / TypeScript file set are applied from the
+   * current {@link codegenOptions} so a Config edit regenerates immediately.
    */
   syncFiles: (ast: SchemaAst) => void;
   /** Open a file as a tab (no-op if unknown) and make it active. */
@@ -71,6 +106,18 @@ export interface CodeWorkspaceState {
   revertFile: (id: string) => void;
   /** Discard edits on every dirty file. */
   revertAll: () => void;
+
+  /** Switch the active right-sidebar tab. */
+  setActiveRightSidebarTab: (tab: RightSidebarTab) => void;
+  /** Replace the parsed symbols shown in the Outline tab. */
+  setParsedSymbols: (symbols: OutlineSymbol[]) => void;
+  /**
+   * Ask Monaco to reveal a 1-based line. Increments an internal nonce so the
+   * consumer effect re-fires even when the same line is requested twice.
+   */
+  requestRevealLine: (line: number) => void;
+  /** Patch the code-generation options (provider, urlEnv, file toggles). */
+  updateCodegenOptions: (patch: Partial<CodegenOptions>) => void;
 }
 
 /** Build a fresh VFS entry from a generated {@link CodeFile}. */
@@ -96,14 +143,35 @@ function toWorkspaceFile(file: CodeFile): WorkspaceFile {
  * the shell calls it with a (deferred) AST so rapid canvas edits regenerate
  * cleanly while preserving in-progress manual edits.
  */
-export const useCodeWorkspaceStore = create<CodeWorkspaceState>()((set) => ({
+export const useCodeWorkspaceStore = create<CodeWorkspaceState>()((set, get) => ({
   files: [],
   openTabIds: [],
   activeFileId: null,
+  activeRightSidebarTab: "outline",
+  parsedSymbols: [],
+  revealRequest: null,
+  codegenOptions: {
+    provider: "postgresql",
+    urlEnv: "DATABASE_URL",
+    includeZod: true,
+    includeTypeScript: true,
+    autoFormatOnSave: true,
+  },
 
   syncFiles: (ast) =>
     set((state) => {
-      const generated = generateCodeFiles(ast);
+      const options = state.codegenOptions;
+      // Apply the live Config: datasource block + which artifact files exist.
+      const effectiveAst: SchemaAst = {
+        ...ast,
+        datasource: { provider: options.provider, urlEnv: options.urlEnv },
+      };
+      const allFiles = generateCodeFiles(effectiveAst);
+      const generated = allFiles.filter((file) => {
+        if (file.kind === "zod") return options.includeZod;
+        if (file.kind === "typescript") return options.includeTypeScript;
+        return true;
+      });
       const byId = new Map(state.files.map((f) => [f.id, f]));
 
       const files: WorkspaceFile[] = generated.map((gen) => {
@@ -186,6 +254,21 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceState>()((set) => ({
         f.dirty ? { ...f, content: f.generatedContent, dirty: false } : f,
       ),
     })),
+
+  setActiveRightSidebarTab: (tab) => set({ activeRightSidebarTab: tab }),
+
+  setParsedSymbols: (symbols) => set({ parsedSymbols: symbols }),
+
+  requestRevealLine: (line) =>
+    set((state) => ({
+      revealRequest: {
+        line,
+        nonce: (state.revealRequest?.nonce ?? 0) + 1,
+      },
+    })),
+
+  updateCodegenOptions: (patch) =>
+    set((state) => ({ codegenOptions: { ...state.codegenOptions, ...patch } })),
 }));
 
 /** Read-only selector: the active {@link WorkspaceFile}, or undefined. */
