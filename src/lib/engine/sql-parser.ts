@@ -174,7 +174,7 @@ function parseTables(cleaned: string, enums: ParsedSchema["enums"], enumNames: S
     blocks.push({ name: tm[1], inner: cleaned.slice(ps + 1, end) });
     tableRe.lastIndex = end + 1;
   }
-  if (blocks.length === 0) throw new Error('No `CREATE TABLE` found. Paste DDL like `CREATE TABLE "User" (...)`.');
+  if (blocks.length === 0) throw new Error('Aucun `CREATE TABLE` trouvé. Collez du DDL, ex. `CREATE TABLE "User" (...)`.');
   return buildTables(blocks, enums, enumNames);
 }
 

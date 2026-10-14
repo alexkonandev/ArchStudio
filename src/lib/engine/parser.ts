@@ -167,7 +167,7 @@ export function parsePrismaSchema(code: string): ParsedSchema {
   const enumBlocks = blocks.filter((b) => b.kind === "enum");
   const modelBlocks = blocks.filter((b) => b.kind === "model");
   if (blocks.length === 0) {
-    throw new Error("No `model` or `enum` block found. Paste Prisma like `model User { ... }`.");
+    throw new Error("Aucun bloc `model` ou `enum` trouvé. Collez du Prisma, ex. `model User { ... }`.");
   }
   const enums: EnumDefinition[] = enumBlocks.map((b) => ({
     id: createParseId("enum"),
@@ -234,7 +234,7 @@ export function parsePrismaSchema(code: string): ParsedSchema {
     }
     tables.push({ id: createParseId("table"), name: block.name, position: gridPosition(ti), fields });
   });
-  if (tables.length === 0) throw new Error("No `model` block with fields found.");
+  if (tables.length === 0) throw new Error("Aucun bloc `model` avec des champs trouvé.");
   const relations: Relation[] = [];
   const byName = new Map(tables.map((t) => [t.name, t]));
   const seen = new Set<string>();

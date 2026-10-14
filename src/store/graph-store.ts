@@ -15,14 +15,38 @@ import type {
   Relation,
   SchemaAst,
   Table,
+  TableColor,
   TableFlowNode,
   ValidationIssue,
 } from "@/types";
-import { lowerFirst } from "@/lib/engine/shared";
 import { validateGraph } from "@/lib/engine/validation";
+import {
+  normalizeGraph,
+  type NormalizationSummary,
+} from "@/lib/engine/normalize";
+import { validateStoredSchema } from "@/lib/engine/schema";
+import { DEFAULT_ON_DELETE } from "@/lib/engine/relation-defaults";
+import {
+  analyzeJoin,
+  scanOrphanJoins,
+  type JoinCardinality,
+  type SmartJoinSummary,
+} from "@/lib/engine/smart-join";
+import {
+  emptyHistory,
+  pushHistory,
+  redoHistory,
+  takeSnapshot,
+  undoHistory,
+  type HistoryState,
+} from "@/lib/history";
+import { pushToast } from "@/components/ui/toast";
 import type { ParsedSchema } from "@/lib/engine/parser";
+import { emitGraphMutation, onGraphMutation } from "@/lib/collab/graph-sync";
 
 export const GRAPH_NODE_TYPE = "table" as const;
+/** Custom edge renderer (glowing relation cable). */
+export const GRAPH_EDGE_TYPE = "relationship" as const;
 export const STORAGE_KEY = "archstudio_schema_v1";
 
 /** Coalesce burst writes (e.g. dragging a node) into one localStorage write. */
@@ -79,6 +103,81 @@ const withValidation = (next: {
 const nextPosition = (count: number): XYPosition => ({
   x: 80 * ((count + 1) % 6),
   y: 60 * Math.floor((count + 1) / 3),
+});
+
+/** Position offset applied to a duplicated table so it doesn't stack. */
+const DUPLICATE_OFFSET = { x: 48, y: 48 } as const;
+
+/**
+ * Bounded undo/redo history (module scope, never persisted to localStorage).
+ * Each entry is a pre-mutation snapshot of `{ tables, relations, enums }`.
+ * Derived/transient state (nodes, edges, validationIssues, selection) is
+ * rebuilt on restore via `buildGraphState` + `withValidation`.
+ */
+let historyState: HistoryState = emptyHistory();
+
+/** Reactive bump counter mirroring history mutations (see `historyVersion`). */
+let historyVersion = 0;
+
+/** Notify `historyVersion` subscribers after a push/undo/redo/clear. */
+function bumpHistoryVersion(): void {
+  historyVersion += 1;
+  useGraphStore.setState({ historyVersion });
+}
+
+/** True between a node-drag start and its stop: frames must not pollute history. */
+let dragTransactionOpen = false;
+
+/**
+ * Record the current state before a discrete mutation.
+ * No-op while a drag transaction is open (see `beginDragTransaction`).
+ */
+function checkpoint(state: {
+  tables: Table[];
+  relations: Relation[];
+  enums: EnumDefinition[];
+}): void {
+  if (dragTransactionOpen) return;
+  historyState = pushHistory(historyState, takeSnapshot(state));
+  bumpHistoryVersion();
+}
+
+/**
+ * Open a coalescing transaction for a node drag: captures a single checkpoint
+ * for the whole gesture so one Ctrl+Z reverts the entire move.
+ */
+export function beginDragTransaction(): void {
+  if (dragTransactionOpen) return;
+  dragTransactionOpen = true;
+  const { tables, relations, enums } = useGraphStore.getState();
+  historyState = pushHistory(
+    historyState,
+    takeSnapshot({ tables, relations, enums }),
+  );
+  bumpHistoryVersion();
+}
+
+/** Close the drag transaction opened by {@link beginDragTransaction}. */
+export function endDragTransaction(): void {
+  dragTransactionOpen = false;
+}
+
+/** Drop all undo/redo steps (fresh load, reset, hydration). */
+function clearHistory(): void {
+  historyState = emptyHistory();
+  dragTransactionOpen = false;
+  bumpHistoryVersion();
+}
+
+/** Rebuild the full store slice from a restored history snapshot. */
+const restoreSnapshot = (snapshot: {
+  tables: Table[];
+  relations: Relation[];
+  enums: EnumDefinition[];
+}) => ({
+  ...buildGraphState(snapshot.tables, snapshot.relations, snapshot.enums),
+  selectedNodeId: null as string | null,
+  selectedEdgeId: null as string | null,
 });
 
 const tableToNode = (table: Table): TableFlowNode => ({
@@ -254,6 +353,16 @@ const AUTO_LAYOUT = {
   originY: 0,
 } as const;
 
+/**
+ * A canvas connection awaiting a foreign-key decision.
+ * Set by `onConnect` when no compatible FK column is detected; the smart
+ * connect modal resolves it (create a field, or pick an existing one).
+ */
+export interface PendingJoin {
+  sourceId: string;
+  targetId: string;
+}
+
 export interface GraphStore {
   tables: Table[];
   relations: Relation[];
@@ -262,21 +371,69 @@ export interface GraphStore {
   nodes: TableFlowNode[];
   edges: Edge[];
   selectedNodeId: string | null;
-
+  /** Transient event fired after a new relation is wired (toast + edge pulse). */
+  lastRelationEvent: { at: number; from: string; to: string } | null;
+  /** Transient set of table ids to animate with a birth transition. */
+  freshTableIds: string[];
+  /** Transient set of field ids to flash once in their table node. */
+  freshFieldIds: string[];
+  /** Consume one-shot animation markers after their CSS animation has played. */
+  consumeFreshIds: (tableIds?: string[], fieldIds?: string[]) => void;
+  /** Currently selected edge (relation cable), if any. */
+  selectedEdgeId: string | null;
+  /**
+   * Pending smart-join awaiting a FK decision (see {@link PendingJoin}).
+   * `null` when no modal is open.
+   */
+  pendingJoin: PendingJoin | null;
   selectNode: (id: string | null) => void;
+  /** Select an edge; clears any node selection and vice-versa. */
+  selectEdge: (id: string | null) => void;
   onNodesChange: (changes: NodeChange<TableFlowNode>[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
+  /**
+   * Resolve a pending smart-join by wiring the relation through `fromFieldId`.
+   * When `createField` is set, the inferred FK column is created on the source
+   * table first. Runs as a single undoable checkpoint.
+   */
+  resolveSmartJoin: (choice: {
+    fromFieldId?: string;
+    createField?: boolean;
+  }) => void;
+  /** Dismiss the pending smart-join without creating anything. */
+  cancelSmartJoin: () => void;
+  /**
+   * Scan the whole schema and wire every orphan join detected by naming
+   * convention, in a single undoable checkpoint. Returns a summary.
+   */
+  autoDetectRelations: () => SmartJoinSummary;
 
   addTable: (name: string) => void;
   removeTable: (tableId: string) => void;
   renameTable: (tableId: string, name: string) => void;
+  /** Update a table's doc comment (rendered as a `///` in Prisma). */
+  updateTableComment: (tableId: string, comment: string) => void;
+  duplicateTable: (tableId: string) => void;
+  setTableColor: (tableId: string, color: TableColor) => void;
   addField: (tableId: string, field: Omit<Field, "id">) => void;
   updateField: (tableId: string, fieldId: string, patch: Partial<Field>) => void;
   removeField: (tableId: string, fieldId: string) => void;
 
   addRelation: (relation: Omit<Relation, "id">) => void;
+  updateRelation: (relationId: string, patch: Partial<Relation>) => void;
   removeRelation: (relationId: string) => void;
+
+  /** Global undo/redo over discrete graph mutations (Ctrl+Z / Ctrl+Shift+Z). */
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  /**
+   * Bumps on every history mutation (push/undo/redo/clear) so toolbar buttons
+   * can subscribe reactively. The history itself stays module-scoped.
+   */
+  historyVersion: number;
 
   addEnum: (name: string) => void;
   renameEnum: (enumId: string, name: string) => void;
@@ -287,7 +444,32 @@ export interface GraphStore {
 
   applyAutoLayout: () => void;
 
+  /**
+   * One-click gamified normalisation: adds missing primary keys, aligns FK
+   * scalar types with their referenced PK, and covers unique non-PK fields with
+   * a unique index. Runs as a single undoable checkpoint. Returns a summary of
+   * every change so the UI can report it.
+   */
+  normalizeSchema: () => NormalizationSummary;
+
+  // --- Index management (Inspector → Contraintes tab) ---------------------
+
+  /** Add an index covering the given fields on a table. */
+  addIndex: (tableId: string, fieldIds: string[], unique: boolean) => void;
+  /** Remove an index by id. */
+  removeIndex: (tableId: string, indexId: string) => void;
+  /** Toggle the unique flag of an existing index. */
+  toggleIndexUnique: (tableId: string, indexId: string) => void;
+
   getSchemaAst: () => SchemaAst;
+  /**
+   * Load a quick-start template into the canvas.
+   * Replaces the current graph in ONE undoable checkpoint: a single Ctrl+Z
+   * restores the previous schema (unlike `loadSchema` which clears history).
+   * Ids are re-minted via `createId` so loading the same starter twice never
+   * collides, then positions are re-gridded.
+   */
+  applyQuickStarter: (schema: ParsedSchema) => void;
   loadSchema: (schema: ParsedSchema) => void;
   resetGraph: (mode?: "empty" | "seed") => void;
   hydrateFromStorage: () => void;
@@ -297,7 +479,7 @@ const relationToEdge = (relation: Relation): Edge => ({
   id: relation.id,
   source: relation.fromTableId,
   target: relation.toTableId,
-  type: "smoothstep",
+  type: GRAPH_EDGE_TYPE,
 });
 
 const buildGraphState = (tables: Table[], relations: Relation[], enums: EnumDefinition[]) => ({
@@ -309,6 +491,33 @@ const buildGraphState = (tables: Table[], relations: Relation[], enums: EnumDefi
   validationIssues: validateGraph(tables, relations, enums),
   selectedNodeId: null as string | null,
 });
+
+/**
+ * Build a `one-to-one` / `one-to-many` relation wiring `source` → `target`
+ * through an (existing or freshly created) FK column on `source`.
+ * Pure: the caller decides whether to persist it inside a checkpoint.
+ */
+const buildJoinRelation = (
+  source: Table,
+  target: Table,
+  fkField: Field,
+  cardinality: JoinCardinality,
+): Relation => ({
+  id: createId("rel"),
+  name: `${source.name}${target.name}`,
+  type: cardinality === "1:1" ? "one-to-one" : "one-to-many",
+  fromTableId: source.id,
+  toTableId: target.id,
+  fromFieldId: fkField.id,
+  onDelete: DEFAULT_ON_DELETE,
+});
+
+/** Append a freshly created FK column to its source table. */
+const withFkField = (source: Table, fkField: Field): Table => ({
+  ...source,
+  fields: [...source.fields, fkField],
+});
+
 
 const persistState = (tables: Table[], relations: Relation[], enums: EnumDefinition[]): void => {
   try {
@@ -324,9 +533,13 @@ const readStoredSchema = (): ParsedSchema | null => {
     if (typeof window === "undefined" || !("localStorage" in window)) return null;
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<ParsedSchema> | null;
-    if (!parsed || !Array.isArray(parsed.tables) || !Array.isArray(parsed.relations) || !Array.isArray(parsed.enums)) return null;
-    return { tables: parsed.tables, relations: parsed.relations, enums: parsed.enums };
+    const parsed: unknown = JSON.parse(raw);
+    // Runtime validation with Zod: repairs minor corruption via per-field
+    // `.catch()` defaults, and rejects structurally invalid payloads (returns
+    // null) so the caller keeps the default seed schema instead of crashing.
+    const validated = validateStoredSchema(parsed);
+    if (!validated) return null;
+    return { tables: validated.tables, relations: validated.relations, enums: validated.enums };
   } catch {
     return null;
   }
@@ -346,11 +559,54 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
     id: relation.id,
     source: relation.fromTableId,
     target: relation.toTableId,
-    type: "smoothstep",
+    type: GRAPH_EDGE_TYPE,
   })),
   selectedNodeId: null,
 
-  selectNode: (id) => set({ selectedNodeId: id }),
+  selectedEdgeId: null,
+
+  lastRelationEvent: null,
+  pendingJoin: null,
+  freshTableIds: [],
+  freshFieldIds: [],
+
+  historyVersion: 0,
+
+  selectNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
+
+  selectEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
+
+  consumeFreshIds: (tableIds = [], fieldIds = []) =>
+    set((state) => {
+      if (tableIds.length === 0 && fieldIds.length === 0) return state;
+      const tables = new Set(tableIds);
+      const fields = new Set(fieldIds);
+      return {
+        freshTableIds: state.freshTableIds.filter((id) => !tables.has(id)),
+        freshFieldIds: state.freshFieldIds.filter((id) => !fields.has(id)),
+      };
+    }),
+
+  undo: () => {
+    const state = get();
+    const result = undoHistory(historyState, takeSnapshot(state));
+    if (!result) return;
+    historyState = result.state;
+    set(restoreSnapshot(result.snapshot));
+    bumpHistoryVersion();
+  },
+
+  redo: () => {
+    const state = get();
+    const result = redoHistory(historyState, takeSnapshot(state));
+    if (!result) return;
+    historyState = result.state;
+    set(restoreSnapshot(result.snapshot));
+    bumpHistoryVersion();
+  },
+
+  canUndo: () => historyState.past.length > 0,
+  canRedo: () => historyState.future.length > 0,
 
   onNodesChange: (changes) => {
     set((state) => {
@@ -405,58 +661,198 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
     );
     if (duplicate) return;
 
-    let fromTable = from;
-    const fkName = `${lowerFirst(to.name)}Id`;
-    let fkField = from.fields.find((f) => f.name === fkName);
-    if (!fkField) {
-      const parentPk = to.fields.find((f) => f.isPrimaryKey);
-      fkField = toStoredField({
-        name: fkName,
-        type: parentPk?.type ?? "Int",
-        enumName: parentPk?.enumName,
-        isNullable: true,
-        isUnique: false,
-        isPrimaryKey: false,
-        defaultValue: "",
-      });
-      fromTable = { ...from, fields: [...from.fields, fkField] };
-    }
-    const relation: Relation = {
-      id: createId("rel"),
-      name: `${from.name}${to.name}`,
-      type: "one-to-many",
-      fromTableId: from.id,
-      toTableId: to.id,
-      fromFieldId: fkField.id,
-      onDelete: "CASCADE",
-    };
-    set((state) => {
-      const nextTables = state.tables.map((t) =>
-        t.id === fromTable.id ? fromTable : t,
+    const analysis = analyzeJoin(from, to);
+
+    // A compatible FK column already exists — wire the relation immediately.
+    if (analysis.hasForeignKey && analysis.existingField) {
+      const relation = buildJoinRelation(
+        from,
+        to,
+        analysis.existingField,
+        analysis.cardinality,
       );
-      const nextRelations = [...state.relations, relation];
-      return {
-        tables: nextTables,
+      const nextRelations = [...relations, relation];
+      checkpoint(get());
+      set((state) => ({
         relations: nextRelations,
         edges: addEdge(
           {
             id: relation.id,
             source: relation.fromTableId,
             target: relation.toTableId,
-            type: "smoothstep",
+            type: GRAPH_EDGE_TYPE,
+            // Trigger the one-shot glow/pulse along the freshly wired cable.
+            data: { pulse: true },
           },
           state.edges,
         ),
+        selectedNodeId: null,
+        selectedEdgeId: relation.id,
+        pendingJoin: null,
+        lastRelationEvent: {
+          at: Date.now(),
+          from: from.name,
+          to: to.name,
+        },
         ...withValidation({
-          tables: nextTables,
+          tables: state.tables,
           relations: nextRelations,
           enums: state.enums,
         }),
-      };
+      }));
+      pushToast(`Relation ${from.name} → ${to.name} créée`, {
+        type: "success",
+        description: `Champ « ${analysis.existingField.name} » · annulable via Ctrl+Z.`,
+      });
+      return;
+    }
+
+    // No FK column detected: defer the decision to the smart-connect modal.
+    // Nothing is committed yet — the user picks "create field" or an existing
+    // column, then `resolveSmartJoin` records a single undoable step.
+    set({
+      pendingJoin: { sourceId: from.id, targetId: to.id },
+      selectedNodeId: null,
+      selectedEdgeId: null,
     });
   },
 
+  resolveSmartJoin: ({ fromFieldId, createField }) => {
+    const state = get();
+    const pending = state.pendingJoin;
+    if (!pending) return;
+    const source = state.tables.find((t) => t.id === pending.sourceId);
+    const target = state.tables.find((t) => t.id === pending.targetId);
+    if (!source || !target) {
+      set({ pendingJoin: null });
+      return;
+    }
+
+    const analysis = analyzeJoin(source, target);
+    let fkField: Field | undefined;
+    let nextSource = source;
+
+    if (fromFieldId) {
+      // Reuse an existing, type-compatible column chosen by the user.
+      fkField = source.fields.find((f) => f.id === fromFieldId);
+    } else if (createField) {
+      // 1-click: create the inferred FK column (name + referenced PK scalar).
+      const pk = analysis.referencedKey;
+      fkField = toStoredField({
+        name: analysis.suggestedFieldName,
+        type: pk?.type ?? "Int",
+        enumName: pk?.enumName,
+        isNullable: true,
+        isUnique: false,
+        isPrimaryKey: false,
+        defaultValue: "",
+      });
+      nextSource = withFkField(source, fkField);
+    }
+
+    if (!fkField) {
+      set({ pendingJoin: null });
+      return;
+    }
+
+    const cardinality: JoinCardinality = fkField.isUnique ? "1:1" : "1:N";
+    const relation = buildJoinRelation(source, target, fkField, cardinality);
+    const createdField = nextSource !== source;
+
+    checkpoint(state);
+    set((s) => {
+      const tables = createdField
+        ? s.tables.map((t) => (t.id === nextSource.id ? nextSource : t))
+        : s.tables;
+      const relations = [...s.relations, relation];
+      return {
+        tables,
+        relations,
+        edges: addEdge(
+          {
+            id: relation.id,
+            source: relation.fromTableId,
+            target: relation.toTableId,
+            type: GRAPH_EDGE_TYPE,
+            data: { pulse: true },
+          },
+          s.edges,
+        ),
+        pendingJoin: null,
+        selectedNodeId: null,
+        selectedEdgeId: relation.id,
+        freshFieldIds: createdField
+          ? [...s.freshFieldIds, fkField.id]
+          : s.freshFieldIds,
+        lastRelationEvent: {
+          at: Date.now(),
+          from: source.name,
+          to: target.name,
+        },
+        ...withValidation({ tables, relations, enums: s.enums }),
+      };
+    });
+    pushToast(`Relation ${source.name} → ${target.name} créée`, {
+      type: "success",
+      description: createdField
+        ? `Champ « ${fkField.name} » créé · annulable via Ctrl+Z.`
+        : `Champ « ${fkField.name} » · annulable via Ctrl+Z.`,
+    });
+  },
+
+  cancelSmartJoin: () => set({ pendingJoin: null }),
+
+  autoDetectRelations: () => {
+    const state = get();
+    const proposals = scanOrphanJoins(state.tables, state.relations);
+    if (proposals.length === 0) return { created: 0, links: [] };
+
+    // Resolve every proposal against the current tables, then commit the whole
+    // batch in ONE checkpoint so a single Ctrl+Z reverts it entirely.
+    const tableById = new Map(state.tables.map((t) => [t.id, t]));
+    const newRelations: Relation[] = [];
+    const newEdges: Edge[] = [];
+    const links: string[] = [];
+
+    for (const proposal of proposals) {
+      const source = tableById.get(proposal.sourceId);
+      const target = tableById.get(proposal.targetId);
+      if (!source || !target) continue;
+      const fkField = source.fields.find((f) => f.id === proposal.fieldId);
+      if (!fkField) continue;
+      const relation = buildJoinRelation(
+        source,
+        target,
+        fkField,
+        proposal.cardinality,
+      );
+      newRelations.push(relation);
+      newEdges.push({
+        id: relation.id,
+        source: relation.fromTableId,
+        target: relation.toTableId,
+        type: GRAPH_EDGE_TYPE,
+        data: { pulse: true },
+      });
+      links.push(proposal.label);
+    }
+
+    if (newRelations.length === 0) return { created: 0, links: [] };
+
+    checkpoint(state);
+    set((s) => {
+      const relations = [...s.relations, ...newRelations];
+      return {
+        relations,
+        edges: [...s.edges, ...newEdges],
+        ...withValidation({ tables: s.tables, relations, enums: s.enums }),
+      };
+    });
+    return { created: newRelations.length, links };
+  },
+
   addTable: (name) => {
+    checkpoint(get());
     const table: Table = {
       id: createId("table"),
       name: name.trim() || "Untitled",
@@ -468,6 +864,8 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
       return {
         tables,
         nodes: [...state.nodes, tableToNode(table)],
+        // One-shot birth animation: TableNode marks this id, then asks to clear it.
+        freshTableIds: [...state.freshTableIds, table.id],
         ...withValidation({
           tables,
           relations: state.relations,
@@ -478,6 +876,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   removeTable: (tableId) => {
+    checkpoint(get());
     set((state) => {
       const tables = state.tables.filter((t) => t.id !== tableId);
       const relations = state.relations.filter(
@@ -492,12 +891,59 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
         ),
         selectedNodeId:
           state.selectedNodeId === tableId ? null : state.selectedNodeId,
+        selectedEdgeId: null,
         ...withValidation({ tables, relations, enums: state.enums }),
       };
     });
   },
 
+  duplicateTable: (tableId) => {
+    const source = get().tables.find((t) => t.id === tableId);
+    if (!source) return;
+    checkpoint(get());
+    // Deep-clone fields with fresh ids so the copy is fully independent.
+    const newTableId = createId("table");
+    const fields: Field[] = source.fields.map((field) => ({
+      ...field,
+      id: createId("field"),
+    }));
+    const duplicate: Table = {
+      ...source,
+      id: newTableId,
+      name: `${source.name}Copy`,
+      fields,
+      // Offset so the copy doesn't land exactly on top of the original.
+      position: {
+        x: source.position.x + DUPLICATE_OFFSET.x,
+        y: source.position.y + DUPLICATE_OFFSET.y,
+      },
+    };
+    set((state) => {
+      const tables = [...state.tables, duplicate];
+      return {
+        tables,
+        nodes: [...state.nodes, tableToNode(duplicate)],
+        selectedNodeId: newTableId,
+        freshTableIds: [...state.freshTableIds, newTableId],
+        ...withValidation({
+          tables,
+          relations: state.relations,
+          enums: state.enums,
+        }),
+      };
+    });
+  },
+
+  setTableColor: (tableId, color) => {
+    // Color is purely cosmetic: no validation recompute required.
+    checkpoint(get());
+    set((state) => ({
+      tables: state.tables.map((t) => (t.id === tableId ? { ...t, color } : t)),
+    }));
+  },
+
   renameTable: (tableId, name) => {
+    checkpoint(get());
     set((state) => {
       const tables = state.tables.map((t) =>
         t.id === tableId ? { ...t, name } : t,
@@ -512,15 +958,28 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
       };
     });
   },
+  updateTableComment: (tableId, comment) => {
+    checkpoint(get());
+    set((state) => {
+      const tables = state.tables.map((t) =>
+        t.id === tableId ? { ...t, comment: comment || undefined } : t,
+      );
+      return { tables };
+    });
+  },
   addField: (tableId, field) => {
+    checkpoint(get());
+    const fresh = toStoredField(field);
     set((state) => {
       const tables = state.tables.map((t) =>
         t.id === tableId
-          ? { ...t, fields: [...t.fields, toStoredField(field)] }
+          ? { ...t, fields: [...t.fields, fresh] }
           : t,
       );
       return {
         tables,
+        // One-shot row flash: TableNode marks this id, then asks to clear it.
+        freshFieldIds: [...state.freshFieldIds, fresh.id],
         ...withValidation({
           tables,
           relations: state.relations,
@@ -531,6 +990,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   updateField: (tableId, fieldId, patch) => {
+    checkpoint(get());
     set((state) => {
       const tables = state.tables.map((t) =>
         t.id !== tableId
@@ -562,6 +1022,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   removeField: (tableId, fieldId) => {
+    checkpoint(get());
     set((state) => {
       const tables = state.tables.map((t) =>
         t.id === tableId
@@ -580,6 +1041,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
   addRelation: (relation) => {
     const full: Relation = { ...relation, id: createId("rel") };
+    checkpoint(get());
     set((state) => {
       const relations = [...state.relations, full];
       return {
@@ -590,7 +1052,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
             id: full.id,
             source: full.fromTableId,
             target: full.toTableId,
-            type: "smoothstep",
+            type: GRAPH_EDGE_TYPE,
           },
         ],
         ...withValidation({
@@ -602,7 +1064,30 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
     });
   },
 
+  updateRelation: (relationId, patch) => {
+    const current = get().relations.find((r) => r.id === relationId);
+    if (!current) return;
+    checkpoint(get());
+    set((state) => {
+      const relations = state.relations.map((r) =>
+        r.id === relationId ? { ...r, ...patch, id: r.id } : r,
+      );
+      return {
+        relations,
+        edges: state.edges.map((e) =>
+          e.id === relationId ? { ...e, type: GRAPH_EDGE_TYPE } : e,
+        ),
+        ...withValidation({
+          tables: state.tables,
+          relations,
+          enums: state.enums,
+        }),
+      };
+    });
+  },
+
   removeRelation: (relationId) => {
+    checkpoint(get());
     set((state) => {
       const relations = state.relations.filter((r) => r.id !== relationId);
       return {
@@ -618,6 +1103,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   addEnum: (name) => {
+    checkpoint(get());
     const trimmed = name.trim() || `Enum${get().enums.length + 1}`;
     const item: EnumDefinition = {
       id: createId("enum"),
@@ -638,6 +1124,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   renameEnum: (enumId, name) => {
+    checkpoint(get());
     set((state) => {
       const prev = state.enums.find((e) => e.id === enumId);
       const enums = state.enums.map((e) =>
@@ -663,6 +1150,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   removeEnum: (enumId) => {
+    checkpoint(get());
     set((state) => {
       const enums = state.enums.filter((e) => e.id !== enumId);
       return {
@@ -677,6 +1165,10 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   addEnumValue: (enumId, value) => {
+    const trimmed = value.trim();
+    // Reject empty values so an enum never holds an invalid blank entry.
+    if (!trimmed) return;
+    checkpoint(get());
     set((state) => {
       const enums = state.enums.map((e) =>
         e.id === enumId
@@ -684,7 +1176,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
               ...e,
               values: [
                 ...e.values,
-                value.trim() || `VALUE_${e.values.length + 1}`,
+                trimmed || `VALUE_${e.values.length + 1}`,
               ],
             }
           : e,
@@ -701,6 +1193,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   updateEnumValue: (enumId, index, value) => {
+    checkpoint(get());
     set((state) => {
       const enums = state.enums.map((e) =>
         e.id === enumId
@@ -719,6 +1212,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   removeEnumValue: (enumId, index) => {
+    checkpoint(get());
     set((state) => {
       const enums = state.enums.map((e) =>
         e.id === enumId
@@ -737,6 +1231,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   },
 
   applyAutoLayout: () => {
+    checkpoint(get());
     set((state) => {
       const stepX = AUTO_LAYOUT.cardWidth + AUTO_LAYOUT.gapX;
       const tables = state.tables.map((table, index) => {
@@ -764,6 +1259,92 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
     });
   },
 
+  normalizeSchema: () => {
+    const state = get();
+    const { tables, relations, summary } = normalizeGraph(
+      state.tables,
+      state.relations,
+    );
+    if (summary.noop) return summary;
+    // One checkpoint for the whole batch: a single Ctrl+Z reverts everything.
+    checkpoint(state);
+    set({
+      tables,
+      relations,
+      nodes: tables.map((table) => ({
+        id: table.id,
+        type: GRAPH_NODE_TYPE,
+        position: { ...table.position },
+        data: { tableId: table.id },
+      })),
+      edges: relations.map((rel) => ({
+        id: rel.id,
+        source: rel.fromTableId,
+        target: rel.toTableId,
+        type: GRAPH_EDGE_TYPE,
+      })),
+      ...withValidation({ tables, relations, enums: state.enums }),
+    });
+    return summary;
+  },
+
+  addIndex: (tableId, fieldIds, unique) => {
+    if (fieldIds.length === 0) return;
+    checkpoint(get());
+    set((state) => {
+      const tables = state.tables.map((t) =>
+        t.id === tableId
+          ? {
+              ...t,
+              indexes: [
+                ...(t.indexes ?? []),
+                { id: createId("index"), fieldIds, unique },
+              ],
+            }
+          : t,
+      );
+      return {
+        tables,
+        ...withValidation({ tables, relations: state.relations, enums: state.enums }),
+      };
+    });
+  },
+
+  removeIndex: (tableId, indexId) => {
+    checkpoint(get());
+    set((state) => {
+      const tables = state.tables.map((t) =>
+        t.id === tableId
+          ? { ...t, indexes: (t.indexes ?? []).filter((i) => i.id !== indexId) }
+          : t,
+      );
+      return {
+        tables,
+        ...withValidation({ tables, relations: state.relations, enums: state.enums }),
+      };
+    });
+  },
+
+  toggleIndexUnique: (tableId, indexId) => {
+    checkpoint(get());
+    set((state) => {
+      const tables = state.tables.map((t) =>
+        t.id === tableId
+          ? {
+              ...t,
+              indexes: (t.indexes ?? []).map((i) =>
+                i.id === indexId ? { ...i, unique: !i.unique } : i,
+              ),
+            }
+          : t,
+      );
+      return {
+        tables,
+        ...withValidation({ tables, relations: state.relations, enums: state.enums }),
+      };
+    });
+  },
+
   getSchemaAst: () => {
     const { tables, relations, enums } = get();
     return {
@@ -775,8 +1356,63 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
     };
   },
 
+  applyQuickStarter: (schema) => {
+    checkpoint(get());
+    const tableIdMap = new Map<string, string>();
+    const tables: Table[] = schema.tables.map((t, index) => {
+      const nextId = createId("table");
+      tableIdMap.set(t.id, nextId);
+      // Preserve authored positions (presets) when present, otherwise grid.
+      const fallback = { x: (index % 2) * 400, y: Math.floor(index / 2) * 360 };
+      const position =
+        Number.isFinite(t.position?.x) && Number.isFinite(t.position?.y)
+          ? { ...t.position }
+          : fallback;
+      return {
+        ...t,
+        id: nextId,
+        position,
+        color: t.color,
+        comment: t.comment,
+        indexes: t.indexes ? structuredClone(t.indexes) : undefined,
+        fields: t.fields.map((fld) => toStoredField(fld, createId("field"))),
+      };
+    });
+    const relations: Relation[] = [];
+    for (const r of schema.relations) {
+      const fromTableId = tableIdMap.get(r.fromTableId);
+      const toTableId = tableIdMap.get(r.toTableId);
+      if (!fromTableId || !toTableId) continue;
+      // FK ids are re-minted: resolve through the original field name.
+      const originalFrom = schema.tables.find((t) => t.id === r.fromTableId);
+      const originalFk = originalFrom?.fields.find(
+        (fld) => fld.id === r.fromFieldId,
+      );
+      const fromTable = tables.find((t) => t.id === fromTableId);
+      const resolvedFk = originalFk
+        ? fromTable?.fields.find((fld) => fld.name === originalFk.name)
+        : undefined;
+      relations.push({
+        ...r,
+        id: createId("rel"),
+        fromTableId,
+        toTableId,
+        fromFieldId: resolvedFk?.id,
+      });
+    }
+    const enums: EnumDefinition[] = schema.enums.map((e) => ({
+      ...e,
+      id: createId("enum"),
+      values: [...e.values],
+    }));
+    const next = buildGraphState(tables, relations, enums);
+    set(next);
+    persistState(tables, relations, enums);
+  },
+
   loadSchema: (schema) => {
     const next = buildGraphState(schema.tables, schema.relations, schema.enums);
+    clearHistory();
     set(next);
     persistState(schema.tables, schema.relations, schema.enums);
   },
@@ -785,6 +1421,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
     const tables = mode === "seed" ? seedTables() : [];
     const relations = mode === "seed" ? seedRelations() : [];
     const enums = mode === "seed" ? seedEnums() : [];
+    clearHistory();
     set(buildGraphState(tables, relations, enums));
     persistState(tables, relations, enums);
   },
@@ -792,6 +1429,7 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   hydrateFromStorage: () => {
     const stored = readStoredSchema();
     if (!stored) return;
+    clearHistory();
     set(buildGraphState(stored.tables, stored.relations, stored.enums));
   },
 }));
@@ -819,5 +1457,61 @@ if (typeof window !== "undefined") {
     persistTimer = null;
     const { tables, relations, enums } = useGraphStore.getState();
     persistState(tables, relations, enums);
+  });
+
+  // --- Real-time inter-tab sync (BroadcastChannel) -------------------------
+  // Guard against back-propagation loops: while we apply a snapshot received
+  // from another tab we must NOT re-broadcast it, or two tabs would ping-pong
+  // the same state forever. `applyingRemote` flips the outbound subscription
+  // off for the duration of the inbound `set`.
+  let applyingRemote = false;
+
+  // Reference of the last broadcast graph slice. `set` produces fresh arrays
+  // only for the slices a mutation touched, so a reference change is a cheap
+  // and precise signal to broadcast - selection / transient edits are ignored.
+  let lastEmitted: {
+    tables: Table[];
+    relations: Relation[];
+    enums: EnumDefinition[];
+  } | null = null;
+
+  useGraphStore.subscribe((state) => {
+    if (applyingRemote) return;
+    if (
+      lastEmitted &&
+      lastEmitted.tables === state.tables &&
+      lastEmitted.relations === state.relations &&
+      lastEmitted.enums === state.enums
+    ) {
+      return;
+    }
+    lastEmitted = {
+      tables: state.tables,
+      relations: state.relations,
+      enums: state.enums,
+    };
+    emitGraphMutation({
+      tables: state.tables,
+      relations: state.relations,
+      enums: state.enums,
+    });
+  });
+
+  // Apply mutations broadcast by other tabs in silent mode: the
+  // `applyingRemote` guard keeps the subscription above from echoing the
+  // freshly applied state right back out onto the channel.
+  onGraphMutation((payload) => {
+    applyingRemote = true;
+    try {
+      const next = buildGraphState(payload.tables, payload.relations, payload.enums);
+      lastEmitted = {
+        tables: payload.tables,
+        relations: payload.relations,
+        enums: payload.enums,
+      };
+      useGraphStore.setState(next);
+    } finally {
+      applyingRemote = false;
+    }
   });
 }

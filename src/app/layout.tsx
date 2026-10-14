@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { ToastProvider } from "@/components/ui/toast";
+import { GlobalCelebration } from "@/components/canvas/global-celebration";
+import { CommandPalette } from "@/components/toolbar/command-palette";
+import { Tooltip } from "@base-ui/react/tooltip";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "ArchStudio — Visual Database Modeler",
+  title: "ArchStudio — Modeler visuel de bases de données",
   description:
-    "Model your database visually and generate Prisma schemas and SQL.",
+    "Modélisez votre base de données visuellement et générez des schémas Prisma et SQL.",
 };
 
 export default function RootLayout({
@@ -17,9 +21,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("dark font-sans", geist.variable)}>
-      <body className="h-dvh overflow-hidden bg-background text-foreground antialiased">
-        {children}
+    <html lang="fr" className={cn("font-sans", geist.variable)}>
+      <body className="min-h-dvh bg-background text-foreground antialiased">
+        <Tooltip.Provider>
+          <ToastProvider>
+            {children}
+            <CommandPalette />
+          </ToastProvider>
+          <GlobalCelebration />
+        </Tooltip.Provider>
       </body>
     </html>
   );

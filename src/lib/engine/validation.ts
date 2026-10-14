@@ -37,7 +37,7 @@ export function validateGraph(
         issues.push({
           id: `duplicate-table:${dup.id}`,
           severity: "error",
-          message: `Table name "${name}" is used ${group.length} times. Names must be unique.`,
+          message: `Le nom de table « ${name} » est utilisé ${group.length} fois. Les noms doivent être uniques.`,
           target: { tableId: dup.id },
         });
       }
@@ -50,7 +50,7 @@ export function validateGraph(
       issues.push({
         id: `missing-pk:${table.id}`,
         severity: "warning",
-        message: `Table "${table.name}" has no primary key.`,
+        message: `La table « ${table.name} » n'a pas de clé primaire.`,
         target: { tableId: table.id },
       });
     }
@@ -72,7 +72,7 @@ export function validateGraph(
           issues.push({
             id: `duplicate-field:${table.id}:${dup.id}`,
             severity: "error",
-            message: `Field "${name}" is declared ${group.length} times in table "${table.name}".`,
+            message: `Le champ « ${name} » est déclaré ${group.length} fois dans la table « ${table.name} ».`,
             target: { tableId: table.id, fieldId: dup.id },
           });
         }
@@ -87,14 +87,14 @@ export function validateGraph(
         issues.push({
           id: `enum-missing-ref:${table.id}:${field.id}`,
           severity: "error",
-          message: `Field "${table.name}.${field.name}" uses type Enum without selecting an enum.`,
+          message: `Le champ « ${table.name}.${field.name} » utilise le type Enum sans sélectionner d'énum.`,
           target: { tableId: table.id, fieldId: field.id },
         });
       } else if (!enumByName.has(ref)) {
         issues.push({
           id: `enum-unknown:${table.id}:${field.id}`,
           severity: "error",
-          message: `Field "${table.name}.${field.name}" references unknown enum "${ref}".`,
+          message: `Le champ « ${table.name}.${field.name} » référence un énum inconnu « ${ref} ».`,
           target: { tableId: table.id, fieldId: field.id },
         });
       }
@@ -118,7 +118,7 @@ export function validateGraph(
         issues.push({
           id: `duplicate-enum:${dup.id}`,
           severity: "error",
-          message: `Enum name "${name}" is declared ${group.length} times.`,
+          message: `Le nom d'énum « ${name} » est déclaré ${group.length} fois.`,
           target: { tableId: tables[0]?.id ?? "" },
         });
       }
@@ -130,7 +130,7 @@ export function validateGraph(
       issues.push({
         id: `empty-enum:${item.id}`,
         severity: "warning",
-        message: `Enum "${item.name || item.id}" has no values.`,
+        message: `L'énum « ${item.name || item.id} » n'a aucune valeur.`,
         target: { tableId: tables[0]?.id ?? "" },
       });
     }
@@ -155,7 +155,7 @@ export function validateGraph(
       issues.push({
         id: `orphan-fk:${rel.id}`,
         severity: "error",
-        message: `Relation "${label}" points to a missing FK field in "${fromTable.name}".`,
+        message: `La relation « ${label} » pointe vers un champ de clé étrangère manquant dans « ${fromTable.name} ».`,
         target: {
           tableId: rel.fromTableId,
           fieldId: rel.fromFieldId,
@@ -182,7 +182,7 @@ export function validateGraph(
       issues.push({
         id: `type-mismatch:${rel.id}`,
         severity: "error",
-        message: `Type mismatch on relation "${fromTable.name}.${fkField.name}" -> "${toTable.name}.${pkField.name}": ${detail}. FK and PK scalar types must be identical.`,
+        message: `Incohérence de type sur la relation « ${fromTable.name}.${fkField.name} » -> « ${toTable.name}.${pkField.name} » : ${detail}. Les types scalaires de la clé étrangère et de la clé primaire doivent être identiques.`,
         target: {
           tableId: rel.fromTableId,
           fieldId: fkField.id,

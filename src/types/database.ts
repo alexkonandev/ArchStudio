@@ -22,6 +22,23 @@ export const FIELD_TYPES = [
 
 export type FieldType = (typeof FIELD_TYPES)[number];
 
+/**
+ * Pastel accent palette for a table's header/badge on the canvas.
+ * Drives the glassmorphism theming of {@link Table} nodes.
+ */
+export const TABLE_COLORS = [
+  "emerald",
+  "indigo",
+  "rose",
+  "amber",
+  "slate",
+] as const;
+
+export type TableColor = (typeof TABLE_COLORS)[number];
+
+/** Default accent when a table has no explicit color. */
+export const DEFAULT_TABLE_COLOR: TableColor = "slate";
+
 /** A column / attribute of a table. */
 export interface Field {
   /** Stable client-side id (uuid). */
@@ -63,6 +80,8 @@ export interface Table {
   indexes?: TableIndex[];
   position: { x: number; y: number };
   comment?: string;
+  /** Optional pastel accent for the canvas node header/badge. */
+  color?: TableColor;
 }
 
 export interface TableIndex {
