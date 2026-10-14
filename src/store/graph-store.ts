@@ -129,6 +129,30 @@ function bumpHistoryVersion(): void {
 let dragTransactionOpen = false;
 
 /**
+ * True while we apply a snapshot that must NOT be re-broadcast (remote tab
+ * update, storage hydration). Read by the outbound `subscribe` below so a
+ * tab that just converged never echoes the state back (ping-pong) and never
+ * appears to "reload" its peers when it regains focus.
+ */
+let suspendGraphBroadcast = false;
+
+/** Deep-equality on the persisted graph slice (cheap: schemas are small). */
+function samePersistedSlice(
+  a: { tables: unknown; relations: unknown; enums: unknown },
+  b: { tables: unknown; relations: unknown; enums: unknown },
+): boolean {
+  try {
+    return (
+      JSON.stringify(a.tables) === JSON.stringify(b.tables) &&
+      JSON.stringify(a.relations) === JSON.stringify(b.relations) &&
+      JSON.stringify(a.enums) === JSON.stringify(b.enums)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Record the current state before a discrete mutation.
  * No-op while a drag transaction is open (see `beginDragTransaction`).
  */
@@ -1429,8 +1453,32 @@ export const useGraphStore = create<GraphStore>()((set, get) => ({
   hydrateFromStorage: () => {
     const stored = readStoredSchema();
     if (!stored) return;
-    clearHistory();
-    set(buildGraphState(stored.tables, stored.relations, stored.enums));
+    const current = get();
+    // Idempotent hydration: StrictMode double-mount, remount after a tab
+    // switch, or two pages hydrating the same singleton must be no-ops when
+    // storage already matches memory. Otherwise every focus return would
+    // rebuild `nodes`/`edges` from scratch (remount + fitView replay = the
+    // perceived "auto-reload") and wipe the undo history for nothing.
+    if (
+      samePersistedSlice(
+        { tables: current.tables, relations: current.relations, enums: current.enums },
+        stored,
+      )
+    ) {
+      return;
+    }
+    suspendGraphBroadcast = true;
+    try {
+      clearHistory();
+      set({
+        ...buildGraphState(stored.tables, stored.relations, stored.enums),
+        // Hydration restores persisted data, never the transient UI state.
+        selectedNodeId: current.selectedNodeId,
+        selectedEdgeId: current.selectedEdgeId,
+      });
+    } finally {
+      suspendGraphBroadcast = false;
+    }
   },
 }));
 
@@ -1462,9 +1510,11 @@ if (typeof window !== "undefined") {
   // --- Real-time inter-tab sync (BroadcastChannel) -------------------------
   // Guard against back-propagation loops: while we apply a snapshot received
   // from another tab we must NOT re-broadcast it, or two tabs would ping-pong
-  // the same state forever. `applyingRemote` flips the outbound subscription
-  // off for the duration of the inbound `set`.
-  let applyingRemote = false;
+  // the same state forever. `suspendGraphBroadcast` flips the outbound
+  // subscription off for the duration of the inbound `set`. It is also set by
+  // `hydrateFromStorage` so a tab regaining focus never echoes stale state.
+  // NOTE: no `visibilitychange` / `focus` / `location.reload` / `router.refresh`
+  // listener exists anywhere on purpose — tab focus must never reset the store.
 
   // Reference of the last broadcast graph slice. `set` produces fresh arrays
   // only for the slices a mutation touched, so a reference change is a cheap
@@ -1476,7 +1526,7 @@ if (typeof window !== "undefined") {
   } | null = null;
 
   useGraphStore.subscribe((state) => {
-    if (applyingRemote) return;
+    if (suspendGraphBroadcast) return;
     if (
       lastEmitted &&
       lastEmitted.tables === state.tables &&
@@ -1498,10 +1548,21 @@ if (typeof window !== "undefined") {
   });
 
   // Apply mutations broadcast by other tabs in silent mode: the
-  // `applyingRemote` guard keeps the subscription above from echoing the
-  // freshly applied state right back out onto the channel.
+  // `suspendGraphBroadcast` guard keeps the subscription above from echoing the
+  // freshly applied state right back out onto the channel. Identical snapshots
+  // (e.g. immediate echo after our own hydration) are dropped so the canvas
+  // never rebuilds `nodes`/`edges` — and never replays `fitView` — on tab focus.
   onGraphMutation((payload) => {
-    applyingRemote = true;
+    const current = useGraphStore.getState();
+    if (
+      samePersistedSlice(
+        { tables: current.tables, relations: current.relations, enums: current.enums },
+        payload,
+      )
+    ) {
+      return;
+    }
+    suspendGraphBroadcast = true;
     try {
       const next = buildGraphState(payload.tables, payload.relations, payload.enums);
       lastEmitted = {
@@ -1509,9 +1570,14 @@ if (typeof window !== "undefined") {
         relations: payload.relations,
         enums: payload.enums,
       };
-      useGraphStore.setState(next);
+      useGraphStore.setState({
+        ...next,
+        // Remote sync replaces data, never the local transient selection.
+        selectedNodeId: current.selectedNodeId,
+        selectedEdgeId: current.selectedEdgeId,
+      });
     } finally {
-      applyingRemote = false;
+      suspendGraphBroadcast = false;
     }
   });
 }

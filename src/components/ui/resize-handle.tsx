@@ -33,7 +33,6 @@ export function ResizeHandle({
       aria-orientation="vertical"
       aria-label={label}
       tabIndex={0}
-      title={`${label} — glisser pour redimensionner, double-clic pour réinitialiser`}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
       onDoubleClick={onDoubleClick}

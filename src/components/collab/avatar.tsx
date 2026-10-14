@@ -42,7 +42,7 @@ export function Avatar({
         className,
       )}
       style={{ backgroundColor: color }}
-      title={name}
+      aria-label={name}
     >
       {initials || "?"}
     </span>

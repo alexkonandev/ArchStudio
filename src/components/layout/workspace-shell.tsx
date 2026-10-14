@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCanvasFocus } from "@/hooks/use-zen-mode";
+import { useCanvasFocus } from "@/hooks/use-canvas-focus";
 import { useFocusStore } from "@/store/focus-store";
 import { StudioHeader } from "@/components/toolbar/studio-header";
 import { WorkspacePanels } from "@/components/layout/workspace-panels";

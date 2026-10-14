@@ -100,7 +100,7 @@ export function HealthScoreBar() {
               : "bg-slate-500/10 text-slate-700",
             celebration.shineKey > 0 && "badge-shine",
           )}
-          title={`Rang : ${health.rank.label}`}
+          aria-label={`Rang : ${health.rank.label}`}
         >
           {isPerfect ? (
             <Award className="size-3.5" />
@@ -142,7 +142,7 @@ export function HealthScoreBar() {
         {(health.errorCount > 0 || health.warningCount > 0) && (
           <span
             className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-600"
-            title={`${health.errorCount} erreur(s), ${health.warningCount} avertissement(s)`}
+            aria-label={`${health.errorCount} erreur(s), ${health.warningCount} avertissement(s)`}
           >
             <TriangleAlert className="size-3.5" />
             {health.errorCount + health.warningCount}

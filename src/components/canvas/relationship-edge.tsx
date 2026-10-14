@@ -113,7 +113,6 @@ export function RelationshipEdge({
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             }}
-            title="Configurer la relation"
             aria-label={`Configurer la relation ${cardinalityLabel}`}
           >
             {cardinalityLabel}

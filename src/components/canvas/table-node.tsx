@@ -8,6 +8,7 @@ import type { TableFlowNode } from "@/types";
 import { useGraphStore } from "@/store/graph-store";
 import { useCollabStore } from "@/store/collab-store";
 import { getTableColorTheme } from "@/lib/table-colors";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FloatingNodeToolbar } from "./floating-node-toolbar";
 import { useTableLock, useUnreadCount } from "@/components/collab/collab-badges";
 
@@ -109,13 +110,12 @@ export function TableNode({ id, selected }: NodeProps<TableFlowNode>) {
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
             {lock && (
-              <span
-                className="flex items-center gap-1 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700"
-                title={`${lock.userName} édite cette table`}
-              >
-                <Lock className="size-3" />
-                {lock.userName.split(" ")[0]}
-              </span>
+              <Tooltip label={`${lock.userName} édite cette table`}>
+                <span className="flex items-center gap-1 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">
+                  <Lock className="size-3" />
+                  {lock.userName.split(" ")[0]}
+                </span>
+              </Tooltip>
             )}
             <button
               type="button"

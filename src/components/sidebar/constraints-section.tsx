@@ -3,6 +3,7 @@
 import { ListPlus, Trash2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Relation, Table } from "@/types";
 
@@ -63,29 +64,33 @@ export function ConstraintsSection({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => setIndexUnique(!indexUnique)}
-            aria-pressed={indexUnique}
-            className={cn(
-              "h-7 shrink-0 rounded-md border px-2 font-mono text-[11px] transition-colors",
-              indexUnique
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-muted",
-            )}
-            title="Index unique"
-          >
-            UQ
-          </button>
-          <Button
-            size="icon"
-            className="size-7 shrink-0"
-            onClick={onAddIndex}
-            disabled={!indexField}
-            title="Ajouter l'index"
-          >
-            <ListPlus className="size-3.5" />
-          </Button>
+          <Tooltip label="Index unique">
+            <button
+              type="button"
+              onClick={() => setIndexUnique(!indexUnique)}
+              aria-pressed={indexUnique}
+              aria-label="Index unique"
+              className={cn(
+                "h-7 shrink-0 rounded-md border px-2 font-mono text-[11px] transition-colors",
+                indexUnique
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:bg-muted",
+              )}
+            >
+              UQ
+            </button>
+          </Tooltip>
+          <Tooltip label="Ajouter l'index">
+            <Button
+              size="icon"
+              className="size-7 shrink-0"
+              onClick={onAddIndex}
+              disabled={!indexField}
+              aria-label="Ajouter l'index"
+            >
+              <ListPlus className="size-3.5" />
+            </Button>
+          </Tooltip>
         </div>
 
         {indexes.length === 0 ? (
@@ -103,29 +108,33 @@ export function ConstraintsSection({
                 <span className="min-w-0 flex-1 truncate font-mono text-xs">
                   {index.fieldIds.map(fieldName).join(", ")}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onToggleIndexUnique(index.id)}
-                  aria-pressed={index.unique}
-                  className={cn(
-                    "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
-                    index.unique
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                  title="Basculer unique"
-                >
-                  {index.unique ? "UNIQUE" : "index"}
-                </button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 shrink-0 text-destructive hover:text-destructive"
-                  onClick={() => onRemoveIndex(index.id)}
-                  title="Supprimer l'index"
-                >
-                  <Trash2 className="size-3" />
-                </Button>
+                <Tooltip label="Basculer unique">
+                  <button
+                    type="button"
+                    onClick={() => onToggleIndexUnique(index.id)}
+                    aria-pressed={index.unique}
+                    aria-label="Basculer unique"
+                    className={cn(
+                      "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors",
+                      index.unique
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {index.unique ? "UNIQUE" : "index"}
+                  </button>
+                </Tooltip>
+                <Tooltip label="Supprimer l'index">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => onRemoveIndex(index.id)}
+                    aria-label="Supprimer l'index"
+                  >
+                    <Trash2 className="size-3" />
+                  </Button>
+                </Tooltip>
               </li>
             ))}
           </ul>

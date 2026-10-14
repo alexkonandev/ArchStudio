@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConstraintsSection } from "./constraints-section";
 import { pushToast } from "@/components/ui/toast";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getTableColorTheme } from "@/lib/table-colors";
 import {
@@ -155,7 +156,7 @@ export function InspectorPanel() {
             {!hasPk && (
               <span
                 className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600"
-                title="Aucune clé primaire"
+                aria-label="Aucune clé primaire"
               >
                 sans PK
               </span>
@@ -167,29 +168,33 @@ export function InspectorPanel() {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              disabled={readOnly}
-              onClick={() => {
-                duplicateTable(table.id);
-                pushToast(`Table « ${table.name} » dupliquée`, { type: "success" });
-              }}
-              title="Dupliquer la table (Ctrl+D)"
-            >
-              <Copy className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-destructive hover:text-destructive"
-              disabled={readOnly}
-              onClick={() => setConfirmDelete(true)}
-              title="Supprimer la table"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+            <Tooltip label="Dupliquer la table" shortcut="mod+d">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                disabled={readOnly}
+                onClick={() => {
+                  duplicateTable(table.id);
+                  pushToast(`Table « ${table.name} » dupliquée`, { type: "success" });
+                }}
+                aria-label="Dupliquer la table"
+              >
+                <Copy className="size-3.5" />
+              </Button>
+            </Tooltip>
+            <Tooltip label="Supprimer la table" shortcut="del">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-destructive hover:text-destructive"
+                disabled={readOnly}
+                onClick={() => setConfirmDelete(true)}
+                aria-label="Supprimer la table"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </Tooltip>
           </div>
         </div>
         <div>
@@ -248,16 +253,18 @@ export function InspectorPanel() {
                   }
                   className="h-7 font-mono text-xs"
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 shrink-0 text-destructive hover:text-destructive"
-                  disabled={readOnly}
-                  onClick={() => removeField(table.id, field.id)}
-                  title="Supprimer le champ"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+                <Tooltip label="Supprimer le champ" shortcut="del">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-destructive hover:text-destructive"
+                    disabled={readOnly}
+                    onClick={() => removeField(table.id, field.id)}
+                    aria-label="Supprimer le champ"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </Tooltip>
               </div>
               <div className="flex gap-2">
                 <Select
@@ -280,32 +287,36 @@ export function InspectorPanel() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant={field.isNullable ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-7 px-2 font-mono text-[11px]"
-                  onClick={() =>
-                    updateField(table.id, field.id, {
-                      isNullable: !field.isNullable,
-                    })
-                  }
-                  title="Activer/désactiver nullable"
-                >
-                  {field.isNullable ? "?" : "!"}
-                </Button>
-                <Button
-                  variant={field.isUnique ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-7 px-2 text-[11px]"
-                  onClick={() =>
-                    updateField(table.id, field.id, {
-                      isUnique: !field.isUnique,
-                    })
-                  }
-                  title="Activer/désactiver unique"
-                >
-                  UQ
-                </Button>
+                <Tooltip label="Champ nullable (?) / requis (!)">
+                  <Button
+                    variant={field.isNullable ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 font-mono text-[11px]"
+                    onClick={() =>
+                      updateField(table.id, field.id, {
+                        isNullable: !field.isNullable,
+                      })
+                    }
+                    aria-label="Activer/désactiver nullable"
+                  >
+                    {field.isNullable ? "?" : "!"}
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Contrainte unique">
+                  <Button
+                    variant={field.isUnique ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() =>
+                      updateField(table.id, field.id, {
+                        isUnique: !field.isUnique,
+                      })
+                    }
+                    aria-label="Activer/désactiver unique"
+                  >
+                    UQ
+                  </Button>
+                </Tooltip>
               </div>
               {field.type === "Enum" && (
                 <Select
@@ -346,7 +357,7 @@ export function InspectorPanel() {
                 >
                   <SelectTrigger
                     className="h-7 flex-1 font-mono text-[11px]"
-                    title="Valeur par défaut prédéfinie"
+                    aria-label="Valeur par défaut prédéfinie"
                   >
                     <SelectValue placeholder="Aucune valeur par défaut" />
                   </SelectTrigger>
@@ -368,49 +379,55 @@ export function InspectorPanel() {
                   }
                   placeholder="@default(...)"
                   className="h-7 font-mono text-[11px]"
-                  title="Valeur par défaut brute"
+                  aria-label="Valeur par défaut brute"
                 />
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant={field.isPrimaryKey ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-7 flex-1 text-[11px]"
-                  onClick={() =>
-                    updateField(table.id, field.id, {
-                      isPrimaryKey: !field.isPrimaryKey,
-                    })
-                  }
-                  title="Activer/désactiver la clé primaire"
-                >
-                  PK
-                </Button>
-                <Button
-                  variant={field.isList ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-7 flex-1 text-[11px]"
-                  onClick={() =>
-                    updateField(table.id, field.id, {
-                      isList: !field.isList,
-                    })
-                  }
-                  title="Colonne de type liste (Type[])"
-                >
-                  []
-                </Button>
-                <Button
-                  variant={field.isUpdatedAt ? "secondary" : "outline"}
-                  size="sm"
-                  className="h-7 flex-1 text-[11px]"
-                  onClick={() =>
-                    updateField(table.id, field.id, {
-                      isUpdatedAt: !field.isUpdatedAt,
-                    })
-                  }
-                  title="Activer/désactiver @updatedAt"
-                >
-                  @updatedAt
-                </Button>
+                <Tooltip label="Clé primaire">
+                  <Button
+                    variant={field.isPrimaryKey ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 flex-1 text-[11px]"
+                    onClick={() =>
+                      updateField(table.id, field.id, {
+                        isPrimaryKey: !field.isPrimaryKey,
+                      })
+                    }
+                    aria-label="Activer/désactiver la clé primaire"
+                  >
+                    PK
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Colonne de type liste (Type[])">
+                  <Button
+                    variant={field.isList ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 flex-1 text-[11px]"
+                    onClick={() =>
+                      updateField(table.id, field.id, {
+                        isList: !field.isList,
+                      })
+                    }
+                    aria-label="Colonne de type liste"
+                  >
+                    []
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Met à jour automatiquement la date (@updatedAt)">
+                  <Button
+                    variant={field.isUpdatedAt ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 flex-1 text-[11px]"
+                    onClick={() =>
+                      updateField(table.id, field.id, {
+                        isUpdatedAt: !field.isUpdatedAt,
+                      })
+                    }
+                    aria-label="Activer/désactiver @updatedAt"
+                  >
+                    @updatedAt
+                  </Button>
+                </Tooltip>
               </div>
               </li>
               );
@@ -568,15 +585,17 @@ function EnumSection({
                 onChange={(event) => renameEnum(item.id, event.target.value)}
                 className="h-7 font-mono text-xs"
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 shrink-0 text-destructive hover:text-destructive"
-                onClick={() => removeEnum(item.id)}
-                title="Supprimer l'énum"
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
+              <Tooltip label="Supprimer l'énum">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => removeEnum(item.id)}
+                  aria-label="Supprimer l'énum"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </Tooltip>
             </div>
             <ul className="space-y-1">
               {item.values.map((value, index) => (
@@ -588,15 +607,17 @@ function EnumSection({
                     }
                     className="h-7 font-mono text-[11px]"
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 text-destructive hover:text-destructive"
-                    onClick={() => removeEnumValue(item.id, index)}
-                    title="Supprimer la valeur"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
+                  <Tooltip label="Supprimer la valeur">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0 text-destructive hover:text-destructive"
+                      onClick={() => removeEnumValue(item.id, index)}
+                      aria-label="Supprimer la valeur"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </Tooltip>
                 </li>
               ))}
             </ul>

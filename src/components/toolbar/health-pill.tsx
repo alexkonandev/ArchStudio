@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { Award, ShieldCheck, TriangleAlert, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip } from "@/components/ui/tooltip"
 import { useGraphStore } from "@/store/graph-store"
 import { computeHealthScore } from "@/lib/engine/health-score"
 import { useHealthCelebration } from "@/hooks/use-health-celebration"
@@ -53,13 +54,15 @@ export function HealthPill({
           : "Architecte Junior à 50%"
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 rounded-full border border-border px-2 py-1 transition-colors",
-        tone.ring,
-      )}
-      title={`${health.score}% — ${health.rank.label}\n${health.errorCount} erreur(s), ${health.warningCount} avertissement(s)\n${nextRankHint}`}
+    <Tooltip
+      label={`${health.score}% — ${health.rank.label} · ${health.errorCount} erreur(s), ${health.warningCount} avertissement(s) · ${nextRankHint}`}
     >
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-full border border-border px-2 py-1 transition-colors",
+          tone.ring,
+        )}
+      >
       <button
         type="button"
         onClick={onOpenIssues}
@@ -113,16 +116,19 @@ export function HealthPill({
       </button>
 
       {canNormalize && (
-        <button
-          type="button"
-          onClick={onNormalize}
-          className="flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
-          title="Normaliser en 1-click (ajoute les PK, corrige les types FK, indexe les uniques)"
-        >
-          <Zap className="size-3" />
-          <span className="hidden lg:inline">Normaliser</span>
-        </button>
+        <Tooltip label="Normaliser en 1 clic (ajoute les PK, corrige les types FK, indexe les uniques)">
+          <button
+            type="button"
+            onClick={onNormalize}
+            className="flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+            aria-label="Normaliser le schéma"
+          >
+            <Zap className="size-3" />
+            <span className="hidden lg:inline">Normaliser</span>
+          </button>
+        </Tooltip>
       )}
     </div>
+    </Tooltip>
   )
 }

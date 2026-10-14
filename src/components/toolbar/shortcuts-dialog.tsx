@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Kbd, formatShortcut } from "@/components/ui/kbd";
 import { useCheatsheet } from "@/hooks/use-cheatsheet";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 interface ShortcutGroup {
   title: string;
@@ -31,6 +31,14 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "shift+z", label: "Focus Graphe (plein écran canvas)" },
       { keys: "Échap", label: "Quitter le Focus Graphe" },
       { keys: "Échap", label: "Désélectionner" },
+    ],
+  },
+  {
+    title: "Catalogue & Inspecteur",
+    items: [
+      { keys: "Entrée", label: "Créer la table (champ nom du catalogue)" },
+      { keys: "mod+d", label: "Dupliquer la table sélectionnée" },
+      { keys: "del", label: "Supprimer la sélection" },
     ],
   },
   {
@@ -73,8 +81,12 @@ export function ShortcutsDialog({
   onOpenChange?: (open: boolean) => void
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
-  useCheatsheet(setInternalOpen);
-  // Dual mode: `?` opens via the internal state, a header "?" button drives
+  const toggleInternal = useCallback(
+    () => setInternalOpen((v) => !v),
+    [],
+  );
+  useCheatsheet(toggleInternal);
+  // Dual mode: `?` toggles via the internal state, a header "?" button drives
   // the controlled props. Closing syncs both so the dialog never sticks open.
   const isOpen = (open ?? false) || internalOpen;
   const setOpen = (value: boolean) => {

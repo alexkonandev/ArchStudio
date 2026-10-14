@@ -142,19 +142,20 @@ export function FloatingNodeToolbar({ tableId, visible }: FloatingNodeToolbarPro
       </Popover.Root>
 
       <Popover.Root>
-        <Popover.Trigger
-          className={cn(actionClass, "nodrag")}
-          title="Couleur du modèle"
-          aria-label="Couleur du modèle"
-        >
-          <Palette className="size-4" />
-          <span
-            className={cn(
-              "absolute right-1 bottom-1 size-2 rounded-full ring-1 ring-white",
-              TABLE_COLOR_THEMES[color ?? "slate"].dot,
-            )}
-          />
-        </Popover.Trigger>
+        <Tooltip label="Couleur du modèle">
+          <Popover.Trigger
+            className={cn(actionClass, "nodrag")}
+            aria-label="Couleur du modèle"
+          >
+            <Palette className="size-4" />
+            <span
+              className={cn(
+                "absolute right-1 bottom-1 size-2 rounded-full ring-1 ring-white",
+                TABLE_COLOR_THEMES[color ?? "slate"].dot,
+              )}
+            />
+          </Popover.Trigger>
+        </Tooltip>
         <Popover.Portal>
           <Popover.Positioner sideOffset={8} className="z-50">
             <Popover.Popup className="rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
@@ -167,7 +168,6 @@ export function FloatingNodeToolbar({ tableId, visible }: FloatingNodeToolbarPro
                     key={swatch}
                     type="button"
                     onClick={() => setTableColor(tableId, swatch)}
-                    title={swatch}
                     aria-label={`Couleur ${swatch}`}
                     className={cn(
                       "size-6 rounded-full ring-1 ring-slate-200 transition-transform hover:scale-110",

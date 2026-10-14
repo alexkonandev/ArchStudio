@@ -7,9 +7,11 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  type Edge,
   type EdgeTypes,
   type NodeChange,
   type NodeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Hand, MousePointer2 } from "lucide-react";
@@ -31,6 +33,7 @@ import { RelationPopover } from "./relation-popover";
 import { SmartConnectModal } from "./smart-connect-modal";
 import { CollabCursors, collabToast, useCollabPresence } from "./collab-presence";
 import { FocusExitPill } from "./focus-exit-pill";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** Canvas interaction mode (Figma-style): select vs hand/pan. */
 type CanvasMode = "select" | "pan";
@@ -80,6 +83,16 @@ export function GraphCanvas() {
     () => ({ [GRAPH_EDGE_TYPE]: RelationshipEdge }),
     [],
   );
+
+  /**
+   * One-shot initial framing: `fitView` as a prop re-runs every time the
+   * `nodes` array identity changes (hydration, remote tab sync), which looks
+   * exactly like an auto-reload when returning to the tab (viewport jumps).
+   * Fitting once on init preserves the user's zoom/pan across tab switches.
+   */
+  const fitViewOnce = useCallback((instance: ReactFlowInstance<TableFlowNode, Edge>) => {
+    instance.fitView({ padding: 0.2, duration: 0 });
+  }, []);
 
   /** Live smart-alignment guides shown while a node is dragged. */
   const [guides, setGuides] = useState<AlignmentGuide[]>([]);
@@ -264,7 +277,7 @@ export function GraphCanvas() {
         onPaneClick={() => selectNode(null)}
         onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
-        fitView
+        onInit={fitViewOnce}
         colorMode="light"
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={null}
@@ -305,36 +318,38 @@ export function GraphCanvas() {
 
       {/* Figma-style mode switcher (top-left; HealthScoreBar sits top-center). */}
       <div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 shadow-lg backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => setMode("select")}
-          aria-pressed={mode === "select"}
-          title="Sélection (V)"
-          aria-label="Mode sélection"
-          className={cn(
-            "flex size-7 items-center justify-center rounded-full transition-colors",
-            mode === "select"
-              ? "bg-slate-900 text-white"
-              : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-          )}
-        >
-          <MousePointer2 className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("pan")}
-          aria-pressed={mode === "pan"}
-          title="Main (H ou Espace maintenu)"
-          aria-label="Mode main"
-          className={cn(
-            "flex size-7 items-center justify-center rounded-full transition-colors",
-            mode === "pan"
-              ? "bg-slate-900 text-white"
-              : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-          )}
-        >
-          <Hand className="size-4" />
-        </button>
+        <Tooltip label="Sélection" shortcut="V">
+          <button
+            type="button"
+            onClick={() => setMode("select")}
+            aria-pressed={mode === "select"}
+            aria-label="Mode sélection"
+            className={cn(
+              "flex size-7 items-center justify-center rounded-full transition-colors",
+              mode === "select"
+                ? "bg-slate-900 text-white"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+            )}
+          >
+            <MousePointer2 className="size-4" />
+          </button>
+        </Tooltip>
+        <Tooltip label="Main (pan)" shortcut="H">
+          <button
+            type="button"
+            onClick={() => setMode("pan")}
+            aria-pressed={mode === "pan"}
+            aria-label="Mode main"
+            className={cn(
+              "flex size-7 items-center justify-center rounded-full transition-colors",
+              mode === "pan"
+                ? "bg-slate-900 text-white"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+            )}
+          >
+            <Hand className="size-4" />
+          </button>
+        </Tooltip>
         <span className="hidden px-1.5 text-[10px] text-muted-foreground xl:block">
           V / H · Espace : main
         </span>

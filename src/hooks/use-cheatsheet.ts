@@ -12,21 +12,21 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Global `?` shortcut that opens the keyboard cheatsheet.
+ * Global `?` shortcut that toggles the keyboard cheatsheet.
  *
  * Mirrors `useGlobalHistoryShortcuts`: never fires while the user types in a
- * field. Returns a `setOpen` control the caller wires to its dialog state.
+ * field. Calls `onToggle` so a single listener both opens and closes.
  */
-export function useCheatsheet(setOpen: (open: boolean) => void): void {
+export function useCheatsheet(onToggle: () => void): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key !== "?") return;
       if (isEditableTarget(event.target)) return;
       event.preventDefault();
-      setOpen(true);
+      onToggle();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setOpen]);
+  }, [onToggle]);
 }

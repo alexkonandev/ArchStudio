@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  ChevronDown,
   Copy,
+  LayoutTemplate,
   Menu as MenuIcon,
   OctagonAlert,
   Palette,
@@ -16,9 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/ui/kbd";
+import { Tooltip } from "@/components/ui/tooltip";
 import { pushToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { getTableColorTheme } from "@/lib/table-colors";
+import { QUICK_STARTERS } from "@/lib/templates/quick-starters";
 import { TABLE_COLORS, type TableColor } from "@/types";
 import { useGraphStore } from "@/store/graph-store";
 
@@ -47,14 +51,28 @@ export function CatalogPanel() {
   const duplicateTable = useGraphStore((state) => state.duplicateTable);
   const removeTable = useGraphStore((state) => state.removeTable);
   const setTableColor = useGraphStore((state) => state.setTableColor);
+  const applyQuickStarter = useGraphStore((state) => state.applyQuickStarter);
 
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  // Collapsible so power users can reclaim the space once the canvas is full.
+  const [quickOpen, setQuickOpen] = useState(true);
 
   const submit = () => {
     addTable(name || `Table${tables.length + 1}`);
     setName("");
+  };
+
+  const loadQuickStarter = (id: string) => {
+    const starter = QUICK_STARTERS.find((q) => q.id === id);
+    if (!starter) return;
+    // Undoable: a single checkpoint inside applyQuickStarter (Ctrl+Z restores).
+    applyQuickStarter(starter.schema);
+    pushToast(`Modèle « ${starter.name} » chargé`, {
+      type: "success",
+      description: `${starter.schema.tables.length} table(s) · ${starter.schema.relations.length} relation(s). Annulable via Ctrl+Z.`,
+    });
   };
 
   const issueByTable = useMemo(() => {
@@ -100,10 +118,56 @@ export function CatalogPanel() {
             placeholder="Nom de la table"
             className="h-8"
           />
-          <Button size="icon" className="size-8 shrink-0" onClick={submit} title="Ajouter">
-            <Plus className="size-4" />
-          </Button>
+          <Tooltip label="Ajouter la table" shortcut="Entrée">
+            <Button
+              size="icon"
+              className="size-8 shrink-0"
+              onClick={submit}
+              aria-label="Ajouter la table"
+            >
+              <Plus className="size-4" />
+            </Button>
+          </Tooltip>
         </div>
+      </div>
+
+      {/* Quick starters: one-click templates (undoable + toast). */}
+      <div className="rounded-lg border border-border">
+        <button
+          type="button"
+          onClick={() => setQuickOpen((v) => !v)}
+          aria-expanded={quickOpen}
+          className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+        >
+          <LayoutTemplate className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Démarrage rapide
+          </span>
+          <ChevronDown
+            className={cn(
+              "ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform",
+              !quickOpen && "-rotate-90",
+            )}
+          />
+        </button>
+        {quickOpen && (
+          <div className="grid gap-1.5 px-2.5 pb-2.5">
+            {QUICK_STARTERS.map((starter) => (
+              <button
+                key={starter.id}
+                type="button"
+                onClick={() => loadQuickStarter(starter.id)}
+                aria-label={`Charger le modèle ${starter.name}`}
+                className="rounded-md border border-border px-2 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <span className="block text-xs font-semibold">{starter.name}</span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  {starter.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Search + filters */}
@@ -227,7 +291,7 @@ function CatalogRow({
           ) : !hasPk ? (
             <span
               className="shrink-0 rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-600"
-              title="Sans clé primaire"
+              aria-label="Sans clé primaire"
             >
               PK
             </span>
