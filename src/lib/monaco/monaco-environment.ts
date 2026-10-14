@@ -54,23 +54,74 @@
  * suggestions and link detection.
  */
 
-/** Monaco's `Environment`, narrowed to the hook we define. */
+/**
+ * Monaco's `Environment`, narrowed to the hooks we define.
+ *
+ * `getWorkerUrl` returns a URL and is called *before* `getWorker` by both
+ * worker-creation paths (`standaloneWebWorkerService.js` and the ESM
+ * `workers.js`); either hook disables the worker, but `getWorkerUrl` throws
+ * nowhere user-visible — it never leaves a message in the terminal.
+ */
 interface MonacoWorkerEnvironment {
   getWorker?: (workerId: string, label: string) => Worker;
+  getWorkerUrl?: (workerId: string, label: string) => string;
 }
 
 /**
- * Explains, once per label, why workers are disabled — emitted through Monaco's
- * own `logOnceWebWorkerWarning` path, which prints `err.message`.
+ * Silent no-worker hook: throws, and swallows Monaco's own fallback warnings.
+ *
+ * Three details matter:
+ * 1. `getWorkerUrl` (not `getWorker`) — both worker-creation paths call
+ *    `getWorkerUrl` first (`standaloneWebWorkerService.js`, ESM `workers.js`),
+ *    so throwing here disables every worker from one hook.
+ * 2. Same synchronous-throw semantics: throwing is the only failure mode
+ *    Monaco handles *synchronously* (`_getOrCreateWorker` catches and calls
+ *    `_createFallbackLocalWorker`). Returning a worker — even a broken one —
+ *    would go down the `whenESMWorkerReady` promise path whose unhandled
+ *    `reject` recreates the original `[object ErrorEvent]` bug.
+ * 3. The `catch` calls `logOnceWebWorkerWarning(err)` (`webWorker.js`), which
+ *    always prints a generic "Could not create web worker(s)…" line plus
+ *    `err.message` — even for an empty `Error`. So the throw arms a counter
+ *    and the `console.warn` wrapper installed below swallows exactly the
+ *    warnings that synchronously follow each throw. The fallback itself is
+ *    expected here (main-thread tokenisation only), so silence is correct.
  */
-function disabledWorker(workerId: string, label: string): never {
+let pendingWorkerWarningSuppressions = 0;
+
+function disabledWorkerUrl(workerId: string, label: string): string {
+  // Never fetched: the caller's try/catch intercepts the throw before any
+  // `new Worker(url)` runs. The message stays descriptive so that if the
+  // suppression wrapper ever misses, the terminal still explains itself.
+  pendingWorkerWarningSuppressions += 2;
   throw new Error(
-    `[archstudio] Monaco web workers are disabled: Turbopack emits ` +
-      `"new Worker(new URL(..., import.meta.url))" as a verbatim static asset ` +
-      `instead of a bundled worker chunk, so the worker could never boot ` +
-      `(label "${label}", workerId "${workerId}"). ` +
-      `Monaco is falling back to its main-thread worker, which is expected here.`,
+    `[archstudio] Monaco web workers are disabled by design (label "${label}", ` +
+      `workerId "${workerId}"): Turbopack cannot bundle workers, using the ` +
+      `main-thread fallback.`,
   );
+}
+
+/**
+ * Swallows the two `console.warn` calls Monaco emits per disabled worker
+ * (generic fallback notice + `err.message`). Armed synchronously by
+ * `disabledWorkerUrl`, consumed synchronously by Monaco's `catch`, so no
+ * unrelated warning can be caught in the window.
+ */
+function installWorkerWarningFilter(): void {
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: unknown[]): void => {
+    if (pendingWorkerWarningSuppressions > 0) {
+      const first = args[0];
+      if (
+        typeof first === "string" &&
+        (first.startsWith("Could not create web worker") ||
+          first.startsWith("[archstudio] Monaco web workers are disabled"))
+      ) {
+        pendingWorkerWarningSuppressions -= 1;
+        return;
+      }
+    }
+    originalWarn(...(args as Parameters<typeof console.warn>));
+  };
 }
 
 /** Guards against installing `MonacoEnvironment` twice (HMR / remounts). */
@@ -87,7 +138,10 @@ let installed = false;
 export function installMonacoEnvironment(): void {
   if (installed || typeof window === "undefined") return;
 
-  const environment: MonacoWorkerEnvironment = { getWorker: disabledWorker };
+  installWorkerWarningFilter();
+  const environment: MonacoWorkerEnvironment = {
+    getWorkerUrl: disabledWorkerUrl,
+  };
   globalThis.MonacoEnvironment =
     environment as unknown as typeof globalThis.MonacoEnvironment;
   installed = true;
