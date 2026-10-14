@@ -89,6 +89,25 @@ interface MonacoWorkerEnvironment {
 let pendingWorkerWarningSuppressions = 0;
 
 function disabledWorkerUrl(workerId: string, label: string): string {
+  // Only the editor worker (`editorWorkerService`) has a try/catch around
+  // worker creation (`EditorWorkerClient._getOrCreateWorker`) that falls back
+  // to a real local worker. Every language-service worker (`typescript`,
+  // `javascript`, and any future label) goes through `createWebWorker`, which
+  // has NO try/catch: a synchronous throw becomes a rejected `_client`
+  // promise that each provider (`provideCodeActions`, …) awaits, surfacing
+  // as an Uncaught Runtime Error overlay the moment such a file opens.
+  // So: throw ONLY for the editor worker (real fallback), and hand every
+  // other label a no-op `blob:` worker. `new Worker(blobUrl)` succeeds (CSP
+  // allows `worker-src blob:`), the awaiting providers hang silently instead
+  // of crashing, and no error is ever thrown. Unreachable in practice:
+  // `configureMonaco` disables all TS/JS providers, so this branch should
+  // never even run — but if it does, hanging beats crashing.
+  if (label !== "editorWorkerService") {
+    const blob = new Blob(["self.onmessage = () => {};"], {
+      type: "text/javascript",
+    });
+    return URL.createObjectURL(blob);
+  }
   // Never fetched: the caller's try/catch intercepts the throw before any
   // `new Worker(url)` runs. The message stays descriptive so that if the
   // suppression wrapper ever misses, the terminal still explains itself.
