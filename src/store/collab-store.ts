@@ -13,12 +13,19 @@ import type {
 } from "@/types";
 import { AVATAR_COLORS, LOCK_TTL_MS } from "@/types";
 import { createId, useGraphStore } from "@/store/graph-store";
+import {
+  guestUsername,
+  HOST_USERNAME,
+  USERNAME_MAX_LENGTH,
+  useProfileStore,
+} from "@/store/profile-store";
+import { DEFAULT_ROOM_ID } from "@/lib/collab/transport";
 
 /**
- * Outbound broadcast hook, registered by the sync adapter (see
+ * Outbound publish hook, registered by the sync adapter (see
  * `@/lib/collab/sync`). The store never imports the adapter directly — it just
  * emits messages through this ref, keeping the dependency one-directional and
- * the store usable without a BroadcastChannel (SSR / tests).
+ * the store usable without a transport (SSR / tests).
  */
 let outbound: ((message: CollabMessage) => void) | null = null;
 
@@ -28,29 +35,19 @@ export function setCollabOutbound(
   outbound = fn;
 }
 
+/**
+ * Whether the local display name currently comes from the automatic French
+ * defaults (`Hôte` / `Invité #N`) rather than an explicit user choice. Auto
+ * names may be re-assigned on collision (see `applyRemote`) — user-picked
+ * names never are.
+ */
+let selfNameIsAuto = false;
+
 /** Pick a deterministic pastel accent from a stable id. */
 export const pickAvatarColor = (id: string): string => {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
-};
-
-const FIRST_NAMES = [
-  "Alice",
-  "Bob",
-  "Chloé",
-  "Diego",
-  "Eva",
-  "Farid",
-  "Gina",
-  "Hugo",
-];
-
-/** Friendly auto-name when the user doesn't type one (matches presence UX). */
-const randomName = (id: string): string => {
-  let h = 7;
-  for (let i = 0; i < id.length; i++) h = (h * 13 + id.charCodeAt(i)) >>> 0;
-  return `${FIRST_NAMES[h % FIRST_NAMES.length]} · ${id.slice(-4).toUpperCase()}`;
 };
 
 const newUserId = (): string =>
@@ -84,6 +81,8 @@ export interface CollabStore {
   leaveRoom: () => void;
   updatePresence: () => void;
   setRole: (userId: string, role: CollabRole) => void;
+  /** Apply an updated profile (pseudo + color) and re-announce presence. */
+  applyProfile: (profile: { username: string; userColor: string }) => void;
 
   lockTable: (tableId: string) => void;
   releaseLock: (tableId: string) => void;
@@ -103,10 +102,11 @@ export interface CollabStore {
 
 /**
  * Deterministic placeholder identity rendered during SSR + first client paint.
- * The real per-session identity (unique id, friendly name, pastel color) is
- * minted lazily on the first `joinRoom` call — which only runs in a client
- * effect (see CollabProvider), so the random values can never cause an SSR
- * hydration mismatch on the avatar stack.
+ * The real session identity (stable per-session id, plus a display name that is
+ * either the user-configured pseudo or the automatic French default for the
+ * room — `Hôte` / `Invité #N`) is resolved lazily on the first `joinRoom`
+ * call — which only runs in a client effect (see CollabProvider), so nothing
+ * random can cause an SSR hydration mismatch on the avatar stack.
  */
 const PLACEHOLDER_ID = "local";
 const initialSelf: CollabUser = {
@@ -149,6 +149,20 @@ export const useCollabStore = create<CollabStore>((set, get) => {
       .getState()
       .tables.find((t) => t.id === tableId)?.name ?? tableId;
 
+  /**
+   * Concise French default for the next join: the first participant of an
+   * (apparently) empty room is the `Hôte`; everyone else gets the lowest free
+   * `Invité #N`, based on the participants currently active in the session.
+   */
+  const pickAutoUsername = (): string => {
+    const active = get().participants;
+    if (active.length === 0) return HOST_USERNAME;
+    const taken = new Set(active.map((p) => p.name));
+    let n = 1;
+    while (taken.has(guestUsername(n))) n += 1;
+    return guestUsername(n);
+  };
+
   return {
     self: initialSelf,
     roomId: "",
@@ -162,32 +176,50 @@ export const useCollabStore = create<CollabStore>((set, get) => {
     activityOpen: false,
 
     joinRoom: (name, role, roomId) => {
+      // Resolve the persisted profile (idempotent client-side hydration): the
+      // user's configured pseudo + color replace the old random first names.
+      useProfileStore.getState().hydrate();
+      const profile = useProfileStore.getState();
+      const typedName = name?.trim().slice(0, USERNAME_MAX_LENGTH);
+      // A typed name (Share modal / onboarding) becomes the persisted profile.
+      if (typedName) profile.setUsername(typedName);
+
       const current = get().self;
-      // Lazily mint the real per-session identity on first join (client-only,
-      // post-hydration) so SSR output stays deterministic. One id drives both
-      // the friendly name and the pastel color; it stays stable afterwards.
-      const base =
-        current.id === PLACEHOLDER_ID
-          ? (() => {
-              const id = newUserId();
-              return { id, name: randomName(id), avatarColor: pickAvatarColor(id) };
-            })()
-          : current;
+      // Lazily mint the stable per-session id on first join (client-only,
+      // post-hydration) so SSR output stays deterministic. The id only drives
+      // presence/echo bookkeeping — never the displayed name.
+      const id = current.id === PLACEHOLDER_ID ? newUserId() : current.id;
+      // Display name: an explicit typed name wins, then a persisted custom
+      // pseudo, otherwise the automatic French default for this room
+      // (`Hôte` for the creator, `Invité #N` for everyone else).
+      const autoName = pickAutoUsername();
       const next: CollabUser = {
-        id: base.id,
-        name: name?.trim() ? name.trim() : base.name,
-        avatarColor: base.avatarColor || pickAvatarColor(base.id),
+        id,
+        name:
+          typedName ||
+          (profile.hasCustomUsername ? profile.username : autoName),
+        avatarColor: profile.userColor || pickAvatarColor(id),
         role: role ?? current.role,
         lastActivity: Date.now(),
       };
+      selfNameIsAuto = !typedName && !profile.hasCustomUsername;
+      // Strict room scoping: the transport channel key (BroadcastChannel name /
+      // WebSocket `?room=`) derives from this id — blanks fall back to the
+      // current room, then to the shared default room (same resolution as
+      // `resolveRoomId`), never to an empty channel key.
       set({
         self: next,
-        roomId: roomId ?? get().roomId ?? "default",
+        roomId: roomId || get().roomId || DEFAULT_ROOM_ID,
         status: "connecting",
         participants: [],
       });
-      // Announce ourselves so peers add us and reply with their presence.
+      // Announce ourselves so peers add us and reply with their presence, then
+      // ask for the current schema: the peers already in the room (the "host")
+      // answer with a `sync_state` snapshot so the newcomer is caught up
+      // without a reload. On the very first join the wire may not be open yet —
+      // `startCollabSync` re-emits both once it is (see `sync.ts`).
       broadcast({ type: "presence", user: next });
+      broadcast({ type: "sync_request" });
     },
 
     leaveRoom: () => {
@@ -241,6 +273,36 @@ export const useCollabStore = create<CollabStore>((set, get) => {
         ),
       });
       broadcast({ type: "role", userId, role });
+    },
+
+    applyProfile: ({ username, userColor }) => {
+      const state = get();
+      const trimmed = username.trim().slice(0, USERNAME_MAX_LENGTH);
+      const next: CollabUser = {
+        ...state.self,
+        ...(trimmed ? { name: trimmed } : {}),
+        avatarColor: userColor,
+        lastActivity: Date.now(),
+      };
+      // An explicit pseudo replaces any automatic `Hôte` / `Invité #N` default.
+      if (trimmed) selfNameIsAuto = false;
+      // Keep owned soft-locks in sync so lock badges show the new pseudo too.
+      const tableLocks = Object.fromEntries(
+        Object.entries(state.tableLocks).map(
+          ([tableId, lock]): [string, TableLock] =>
+            lock.userId === next.id
+              ? [tableId, { ...lock, userName: next.name }]
+              : [tableId, lock],
+        ),
+      );
+      set({ self: next, tableLocks });
+      if (state.status === "disconnected") return;
+      // Re-announce presence so peers update our name/color on their stacks
+      // and cursors; refresh our locks alongside.
+      broadcast({ type: "presence", user: next });
+      for (const lock of Object.values(tableLocks)) {
+        if (lock.userId === next.id) broadcast({ type: "lock", lock });
+      }
     },
 
     lockTable: (tableId) => {
@@ -354,6 +416,30 @@ export const useCollabStore = create<CollabStore>((set, get) => {
               { ...message.user, lastActivity: Date.now() },
             ],
           }));
+          // Auto-name collision: two sessions opening an empty room at the same
+          // time can both pick `Hôte` before seeing each other. The tie-break is
+          // deterministic — the greater session id yields, taking the lowest
+          // free `Invité #N`, and re-announces. User-picked names never yield.
+          const after = get();
+          if (
+            selfNameIsAuto &&
+            message.user.name === after.self.name &&
+            after.self.id > message.user.id
+          ) {
+            const taken = new Set([
+              ...after.participants.map((p) => p.name),
+              after.self.name,
+            ]);
+            let n = 1;
+            while (taken.has(guestUsername(n))) n += 1;
+            const renamed: CollabUser = {
+              ...after.self,
+              name: guestUsername(n),
+              lastActivity: Date.now(),
+            };
+            set({ self: renamed });
+            broadcast({ type: "presence", user: renamed });
+          }
           return;
         }
         case "bye": {

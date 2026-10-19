@@ -100,7 +100,7 @@ export function GraphCanvas() {
   const [mode, setMode] = useState<CanvasMode>("select");
   const [spaceHeld, setSpaceHeld] = useState(false);
   const effectivePan = mode === "pan" || spaceHeld;
-  /** Collab review mode: broadcast + render remote cursors (BroadcastChannel). */
+  /** Collab review mode: broadcast + render remote cursors via the shared transport. */
   const [collabEnabled, setCollabEnabled] = useState(false);
   // Mirror of collabEnabled so event handlers can read/toggle the latest value
   // without stalling on a stale closure (and without side effects in a setter).

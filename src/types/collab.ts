@@ -2,7 +2,8 @@
  * Domain model for ArchStudio advanced collaboration & governance.
  *
  * Framework-agnostic types shared by the collaboration store, the
- * BroadcastChannel sync adapter and every collab-aware UI component.
+ * transport sync adapter (BroadcastChannel / WebSocket) and every
+ * collab-aware UI component.
  */
 
 /** RBAC role of a participant inside a room. */
@@ -67,9 +68,11 @@ export interface ActivityEntry {
 }
 
 /**
- * Wire protocol broadcast over {@link BroadcastChannel} between tabs / windows
- * sharing the same room. Every mutation of shared collab state is expressed as
- * one of these messages so remote peers can converge on the same snapshot.
+ * Wire protocol published on the collaboration transport between tabs / windows
+ * / PCs sharing the same room (local BroadcastChannel demo or remote WebSocket
+ * network — see `@/lib/collab/transport`). Every mutation of shared collab
+ * state is expressed as one of these messages so remote peers can converge on
+ * the same snapshot.
  */
 export type CollabMessage =
   | { type: "presence"; user: CollabUser }
@@ -78,7 +81,27 @@ export type CollabMessage =
   | { type: "comment"; comment: Comment }
   | { type: "resolve"; commentId: string; resolved: boolean }
   | { type: "activity"; entry: ActivityEntry }
-  | { type: "role"; userId: string; role: CollabRole };
+  | { type: "role"; userId: string; role: CollabRole }
+  /** Late-joiner catch-up: a peer asks for the current schema state… */
+  | { type: "sync_request" }
+  /** …and the peers already holding one answer with a graph snapshot. */
+  | { type: "sync_state"; payload: unknown };
+
+/**
+ * Pointer presence published on the transport `cursor` topic: remote collaborator
+ * cursors rendered over the canvas. `name` / `color` come from the user's
+ * persistent profile (never a generated name).
+ */
+export interface CursorSyncMessage {
+  kind: "hello" | "cursor" | "bye";
+  id: string;
+  name: string;
+  /** Profile accent color (hex) used to paint the cursor + label. */
+  color: string;
+  /** Normalised viewport coordinates (0..1). */
+  x?: number;
+  y?: number;
+}
 
 /** Pastel avatar palette (light fills with a matching readable text tone). */
 export const AVATAR_COLORS = [

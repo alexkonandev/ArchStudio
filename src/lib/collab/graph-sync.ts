@@ -1,71 +1,73 @@
 "use client";
 
-import type { EnumDefinition, Relation, Table } from "@/types";
+import type {
+  CollabMessage,
+  EnumDefinition,
+  Relation,
+  Table,
+} from "@/types";
+import {
+  isGraphMutationPayload,
+  sendTransport,
+  subscribeTransport,
+} from "@/lib/collab/transport";
 
 /**
- * BroadcastChannel sync adapter for the graph store.
+ * Graph store sync adapter.
  *
- * Every ArchStudio window/tab sharing this channel keeps its canvas in sync:
- * a local graph mutation (add/edit/delete table, relation wiring, drag,
- * normalisation, auto-layout) is broadcast to the other tabs, which apply the
- * fresh `{ tables, relations, enums }` snapshot in place — no reload required.
+ * Every ArchStudio window/PC sharing the same collaboration room keeps its
+ * canvas in sync: a local graph mutation (add/edit/delete table, relation
+ * wiring, drag, normalisation, auto-layout) is published on the shared
+ * transport, which relays the fresh `{ tables, relations, enums }` snapshot to
+ * the other peers — no reload required.
  *
+ * The actual wire (local `BroadcastChannel` demo mode or remote WebSocket
+ * network mode) is chosen by `@/lib/collab/transport`; this module deals with
+ * the `graph` topic of that transport, plus the small late-joiner catch-up
+ * sub-protocol (`sync_request` / `sync_state`) carried on the `collab` topic.
  * The dependency stays one-directional: the store imports this adapter, never
- * the reverse, and everything degrades gracefully when `BroadcastChannel` is
- * unavailable (SSR / unsupported browsers) — the app just runs solo/offline.
+ * the reverse, and everything degrades gracefully (SSR / unsupported browsers)
+ * — the app just runs solo/offline.
  */
 
-/** Channel name — peers on the same channel talk to each other only. */
-export const GRAPH_SYNC_CHANNEL = "archstudio-graph-sync-v1";
-
-/** Payload carrying the authoritative graph snapshot after a mutation. */
+/**
+ * Payload carrying the authoritative graph snapshot after a mutation.
+ * Plain JSON only — it travels verbatim over BroadcastChannel *and* WebSocket.
+ */
 export interface GraphMutationPayload {
   tables: Table[];
   relations: Relation[];
   enums: EnumDefinition[];
 }
 
-/** Wire protocol broadcast over {@link BroadcastChannel} between tabs. */
+/** Wire protocol published on the transport `graph` topic. */
 export interface GraphMutationMessage {
   type: "GRAPH_MUTATION";
   payload: GraphMutationPayload;
 }
 
-/**
- * Lazily created shared channel. Reused across every emit/subscribe call so the
- * whole app talks over a single `BroadcastChannel` instance.
- */
-let channel: BroadcastChannel | null = null;
-
-function getChannel(): BroadcastChannel | null {
-  if (typeof window === "undefined" || !("BroadcastChannel" in window)) return null;
-  if (channel) return channel;
-  channel = new BroadcastChannel(GRAPH_SYNC_CHANNEL);
-  return channel;
-}
 
 /**
- * Emit a graph mutation to every other open tab.
+ * Emit a graph mutation to the room over the shared transport.
  *
- * Per the `BroadcastChannel` spec, the posting channel does not receive its own
- * message, so this never echoes back into the emitter — the back-propagation
- * loop is closed on the *receiver* side by applying remote state in "silent"
- * mode (see `graph-store.ts`).
+ * Local echo is handled centrally: the transport tags every envelope with a
+ * per-session `senderId` and drops messages that bounce back from a WebSocket
+ * relay (BroadcastChannel never echoes to the posting tab by spec). The
+ * back-propagation loop is closed on the *receiver* side by applying remote
+ * state in "silent" mode (see `graph-store.ts`).
  */
 export function emitGraphMutation(payload: GraphMutationPayload): void {
-  const ch = getChannel();
-  if (!ch) return;
   const message: GraphMutationMessage = { type: "GRAPH_MUTATION", payload };
-  try {
-    ch.postMessage(message);
-  } catch {
-    /* channel closed mid-flight */
-  }
+  sendTransport("graph", message);
 }
 
 /**
- * Subscribe to graph mutations broadcast by other tabs. Returns an unsubscribe
- * function so callers can detach cleanly (unmount / teardown).
+ * Subscribe to graph mutations published by other peers (other tabs locally,
+ * other PCs over the network). Returns an unsubscribe function so callers can
+ * detach cleanly (unmount / teardown).
+ *
+ * Inbound payloads are validated before use — over the network they come from
+ * an untrusted source and must never crash the store.
  *
  * The receiving store guards against infinite loops itself: while it applies a
  * remote snapshot it flips an "applying remote" flag that suppresses the local
@@ -74,17 +76,58 @@ export function emitGraphMutation(payload: GraphMutationPayload): void {
 export function onGraphMutation(
   handler: (payload: GraphMutationPayload) => void,
 ): () => void {
-  const ch = getChannel();
-  if (!ch) return () => {};
-
-  const listener = (event: MessageEvent<GraphMutationMessage>): void => {
-    const message = event.data;
-    if (!message || message.type !== "GRAPH_MUTATION" || !message.payload) return;
+  return subscribeTransport("graph", (payload) => {
+    if (!payload || typeof payload !== "object") return;
+    const message = payload as Partial<GraphMutationMessage>;
+    if (message.type !== "GRAPH_MUTATION") return;
+    if (!isGraphMutationPayload(message.payload)) return;
     handler(message.payload);
-  };
+  });
+}
 
-  ch.addEventListener("message", listener);
-  return () => {
-    ch.removeEventListener("message", listener);
-  };
+// ---------------------------------------------------------------------------
+// Late-joiner catch-up (`sync_request` / `sync_state`, `collab` topic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Share the current graph snapshot with a peer that just joined the room
+ * (answer to its `sync_request` — see `collab-store.joinRoom` +
+ * `sync.startCollabSync`). The payload is the same plain-JSON
+ * {@link GraphMutationPayload} as a live mutation, applied by the newcomer in
+ * silent mode: the schema spreads to every browser/tab without a reload.
+ */
+export function emitSyncState(payload: GraphMutationPayload): void {
+  const message: CollabMessage = { type: "sync_state", payload };
+  sendTransport("collab", message);
+}
+
+/**
+ * Subscribe to schema catch-up requests published by late joiners. The store
+ * answers via {@link emitSyncState} when it holds a non-empty graph (the room
+ * host — or any other holder — catches the newcomer up). Returns an
+ * unsubscribe function.
+ */
+export function onSyncRequest(handler: () => void): () => void {
+  return subscribeTransport("collab", (payload) => {
+    if (!payload || typeof payload !== "object") return;
+    if ((payload as { type?: unknown }).type !== "sync_request") return;
+    handler();
+  });
+}
+
+/**
+ * Subscribe to schema snapshots answering our own `sync_request`. Inbound
+ * payloads are validated (network payloads are untrusted) and handed to the
+ * same silent apply path as a live mutation. Returns an unsubscribe function.
+ */
+export function onSyncState(
+  handler: (payload: GraphMutationPayload) => void,
+): () => void {
+  return subscribeTransport("collab", (payload) => {
+    if (!payload || typeof payload !== "object") return;
+    const message = payload as Partial<{ type: string; payload: unknown }>;
+    if (message.type !== "sync_state") return;
+    if (!isGraphMutationPayload(message.payload)) return;
+    handler(message.payload);
+  });
 }

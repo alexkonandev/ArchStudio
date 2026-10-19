@@ -1,0 +1,5 @@
+{
+  "name": "modelizia-collab",
+  "main": "party/server.ts",
+  "compatibilityDate": "2026-10-25"
+}

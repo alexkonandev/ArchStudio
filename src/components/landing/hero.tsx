@@ -11,7 +11,7 @@ export function Hero() {
       <div className="mx-auto max-w-3xl text-center">
         <span className="glass-panel inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
           <Sparkles className="size-3.5 animate-pulse text-indigo-500" />
-          L'art de concevoir vos bases de données
+          L&apos;art de concevoir vos bases de données
         </span>
 
         <h1 className="mt-6 text-4xl font-bold tracking-tight text-balance sm:text-6xl">

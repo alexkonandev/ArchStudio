@@ -42,7 +42,14 @@ import {
 } from "@/lib/history";
 import { pushToast } from "@/components/ui/toast";
 import type { ParsedSchema } from "@/lib/engine/parser";
-import { emitGraphMutation, onGraphMutation } from "@/lib/collab/graph-sync";
+import {
+  emitGraphMutation,
+  emitSyncState,
+  onGraphMutation,
+  onSyncRequest,
+  onSyncState,
+  type GraphMutationPayload,
+} from "@/lib/collab/graph-sync";
 
 export const GRAPH_NODE_TYPE = "table" as const;
 /** Custom edge renderer (glowing relation cable). */
@@ -1552,7 +1559,7 @@ if (typeof window !== "undefined") {
   // freshly applied state right back out onto the channel. Identical snapshots
   // (e.g. immediate echo after our own hydration) are dropped so the canvas
   // never rebuilds `nodes`/`edges` — and never replays `fitView` — on tab focus.
-  onGraphMutation((payload) => {
+  const applyRemoteSnapshot = (payload: GraphMutationPayload) => {
     const current = useGraphStore.getState();
     if (
       samePersistedSlice(
@@ -1579,5 +1586,25 @@ if (typeof window !== "undefined") {
     } finally {
       suspendGraphBroadcast = false;
     }
+  };
+
+  onGraphMutation(applyRemoteSnapshot);
+
+  // --- Late-joiner catch-up (sync_request / sync_state) ----------------------
+  // Joining a room (`/studio?room=…` or the manual room field) broadcasts a
+  // `sync_request` right after the presence announce. Every session holding a
+  // non-empty graph — the room's host above all — answers with its snapshot;
+  // the newcomer applies the first answer through the exact same silent path
+  // as a live mutation, and content-dedupes the extra answers
+  // (`samePersistedSlice`). Nobody has to reload to see the shared schema.
+  onSyncRequest(() => {
+    const state = useGraphStore.getState();
+    if (state.tables.length === 0) return; // nothing to share yet
+    emitSyncState({
+      tables: state.tables,
+      relations: state.relations,
+      enums: state.enums,
+    });
   });
+  onSyncState(applyRemoteSnapshot);
 }

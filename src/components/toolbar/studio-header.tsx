@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  Activity,
   AlertTriangle,
   Code2,
   Database,
@@ -79,6 +80,9 @@ export function StudioHeader() {
   const canUndo = useGraphStore((state) => state.canUndo)();
   const canRedo = useGraphStore((state) => state.canRedo)();
   const pushActivity = useCollabStore((state) => state.pushActivity);
+  // Live activity feed toggle — rendered far right, with the secondary actions.
+  const activityOpen = useCollabStore((state) => state.activityOpen);
+  const setActivityOpen = useCollabStore((state) => state.setActivityOpen);
   const focusCanvasOnly = useFocusStore((state) => state.focusCanvasOnly);
   void historyVersion;
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -293,49 +297,69 @@ export function StudioHeader() {
 
         <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
 
-        {/* Présence live + partage (avatars, activité, bouton Partager). */}
+        {/* Bloc session : dropdown salon | avatars + « N en ligne » | Partager. */}
         <CollabToolbar />
 
-        <Tooltip label="Palette de commandes" shortcut="mod+k" side="bottom">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            onClick={() =>
-              window.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }),
-              )
-            }
-            aria-label="Palette de commandes (Ctrl+K)"
-          >
-            <Search className="size-4" />
-          </Button>
-        </Tooltip>
+        <span aria-hidden className="hidden h-6 w-px shrink-0 bg-border sm:block" />
 
-        <Tooltip label="Focus Graphe — plein écran canvas" shortcut="shift+z" side="bottom">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            onClick={toggleCanvasFocus}
-            aria-pressed={focusCanvasOnly}
-            aria-label="Basculer le Focus Graphe (Shift+Z)"
-          >
-            <Frame className="size-4" />
-          </Button>
-        </Tooltip>
+        {/* Outils secondaires : recherche, focus, raccourcis, activité. */}
+        <div className="flex items-center gap-1">
+          <Tooltip label="Palette de commandes" shortcut="mod+k" side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={() =>
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }),
+                )
+              }
+              aria-label="Palette de commandes (Ctrl+K)"
+            >
+              <Search className="size-4" />
+            </Button>
+          </Tooltip>
 
-        <Tooltip label="Raccourcis clavier" shortcut="?" side="bottom">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            onClick={() => setShortcutsOpen(true)}
-            aria-label="Raccourcis clavier"
-          >
-            <Keyboard className="size-4" />
-          </Button>
-        </Tooltip>
+          <Tooltip label="Focus Graphe — plein écran canvas" shortcut="shift+z" side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={toggleCanvasFocus}
+              aria-pressed={focusCanvasOnly}
+              aria-label="Basculer le Focus Graphe (Shift+Z)"
+            >
+              <Frame className="size-4" />
+            </Button>
+          </Tooltip>
+
+          <Tooltip label="Raccourcis clavier" shortcut="?" side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={() => setShortcutsOpen(true)}
+              aria-label="Raccourcis clavier"
+            >
+              <Keyboard className="size-4" />
+            </Button>
+          </Tooltip>
+
+          {/* Journal d'activité : notifications de session, tout à droite. */}
+          <Tooltip label="Journal d'activité" side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              onClick={() => setActivityOpen(true)}
+              aria-label="Journal d'activité"
+              aria-pressed={activityOpen}
+              data-export-hidden
+            >
+              <Activity className="size-4" />
+            </Button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Controlled dialogs opened from the grouped menu. */}

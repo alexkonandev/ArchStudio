@@ -143,7 +143,7 @@ function toWorkspaceFile(file: CodeFile): WorkspaceFile {
  * the shell calls it with a (deferred) AST so rapid canvas edits regenerate
  * cleanly while preserving in-progress manual edits.
  */
-export const useCodeWorkspaceStore = create<CodeWorkspaceState>()((set, get) => ({
+export const useCodeWorkspaceStore = create<CodeWorkspaceState>()((set) => ({
   files: [],
   openTabIds: [],
   activeFileId: null,

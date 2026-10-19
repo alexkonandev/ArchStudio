@@ -10,7 +10,6 @@ import {
   Table2,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { OutlineSymbol, OutlineSymbolKind } from "@/lib/engine/outline";
 
 /** Icon per outline symbol kind (Prisma / SQL / TS / MD). */

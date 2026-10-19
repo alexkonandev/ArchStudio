@@ -4,19 +4,28 @@ import { useEffect } from "react";
 import type { CollabMessage } from "@/types";
 import { PRESENCE_HEARTBEAT_MS, PRESENCE_STALE_MS } from "@/types";
 import { setCollabOutbound, useCollabStore } from "@/store/collab-store";
+import {
+  closeTransport,
+  onTransportStatus,
+  openTransport,
+  sendTransport,
+  subscribeTransport,
+} from "@/lib/collab/transport";
 
 /**
- * BroadcastChannel sync adapter for real-time collaboration.
+ * Real-time collaboration sync adapter.
  *
- * Simulates multi-user / multi-tab editing: every ArchStudio window sharing the
- * same `roomId` joins one channel. Local store mutations are broadcast through
- * the store's outbound hook; incoming messages are fed back into the store via
- * `applyRemote`. Presence is kept alive with a heartbeat, and stale peers plus
- * expired soft-locks are pruned on a timer.
+ * Joins the collaboration room over the shared transport abstraction
+ * (`@/lib/collab/transport`): PartyKit over WebSocket (multi-PC, multi-room)
+ * when `NEXT_PUBLIC_PARTYKIT_HOST` is configured, any other WebSocket relay
+ * when `NEXT_PUBLIC_COLLAB_WS_URL` is, local multi-tab demo mode
+ * (BroadcastChannel) otherwise. Local store mutations are published through
+ * the store's outbound
+ * hook; incoming messages are fed back into the store via `applyRemote`.
+ * Presence is kept alive with a heartbeat, and stale peers plus expired
+ * soft-locks are pruned on a timer. Wire lifecycle changes (including
+ * WebSocket reconnects) are mirrored into the store's `status`.
  */
-
-/** Channel name for a room — peers on the same room talk to each other only. */
-const channelName = (roomId: string): string => `archstudio:collab:${roomId || "default"}`;
 
 export interface CollabSyncHandle {
   dispose: () => void;
@@ -24,36 +33,69 @@ export interface CollabSyncHandle {
 
 /**
  * Start the real-time sync for the current room. Registers the store's outbound
- * broadcast and wires presence heartbeat + staleness pruning. Returns a dispose
- * function (also auto-run on unmount) that sends `bye` and closes the channel.
+ * publication, wires presence heartbeat + staleness pruning, and mirrors the
+ * transport status. Returns a dispose function (also auto-run on unmount) that
+ * sends `bye`, unsubscribes and closes the wire.
  */
 export function startCollabSync(roomId: string): CollabSyncHandle {
-  if (typeof window === "undefined" || !("BroadcastChannel" in window)) {
-    // No BroadcastChannel (SSR / unsupported): stay usable solo, just offline.
+  if (typeof window === "undefined") return { dispose: () => {} };
+
+  // Bind (or rebind) the wire to this room. Offline (no BroadcastChannel and
+  // no usable WebSocket) → stay usable solo, just offline.
+  const kind = openTransport(roomId);
+  if (kind === "offline") {
     useCollabStore.setState({ status: "disconnected" });
     return { dispose: () => {} };
   }
 
-  const channel = new BroadcastChannel(channelName(roomId));
-  const store = useCollabStore.getState();
+  // Route every local store publication onto the transport.
+  setCollabOutbound((message: CollabMessage) => sendTransport("collab", message));
 
-  // Route every local store emission onto the channel.
-  setCollabOutbound((message: CollabMessage) => {
-    try {
-      channel.postMessage(message);
-    } catch {
-      /* channel closed */
+  // Late-joiner catch-up bookkeeping: flips true once a peer answered our
+  // schema request — it gates the bounded retries below (`requestSchemaState`).
+  let receivedSyncState = false;
+
+  // Inbound collab messages (validated — network payloads are untrusted).
+  const unsubscribeMessages = subscribeTransport("collab", (payload) => {
+    if (!payload || typeof payload !== "object") return;
+    const type = (payload as { type?: unknown }).type;
+    if (typeof type !== "string") return;
+    if (type === "sync_state") receivedSyncState = true;
+    useCollabStore.getState().applyRemote(payload as CollabMessage);
+  });
+
+  // Mirror the wire lifecycle into the store status (reconnects included).
+  // No "already disconnected" guard: `startCollabSync` only runs while a
+  // session is wanted, so it must be able to bring the store back online
+  // (StrictMode double-mount re-runs it after `leaveRoom` set "disconnected").
+  // The handler is unsubscribed *before* `leaveRoom` on dispose, so an
+  // intentional shutdown never flips back.
+  const unsubscribeStatus = onTransportStatus((wireStatus) => {
+    if (wireStatus === "connected") {
+      useCollabStore.setState({ status: "connected" });
+    } else if (wireStatus === "connecting") {
+      useCollabStore.setState({ status: "connecting" });
+    } else {
+      useCollabStore.setState({ status: "disconnected" });
     }
   });
 
-  channel.onmessage = (event: MessageEvent<CollabMessage>) => {
-    const message = event.data;
-    if (!message) return;
-    useCollabStore.getState().applyRemote(message);
+  // Announce ourselves (`presence`) + ask for the room's schema state
+  // (`sync_request`) so a newcomer is caught up without a reload. Re-emitted
+  // here (not only from `joinRoom`) because the store's first `joinRoom` runs
+  // before this wire is open. The request is retried a couple of times while
+  // no `sync_state` has come back yet: over WebSocket the first attempt can
+  // race the host's own connection (or a reconnect), and one lost request
+  // would leave the new browser sitting on an empty canvas.
+  const requestSchemaState = (): void => {
+    if (receivedSyncState) return;
+    sendTransport("collab", { type: "sync_request" } satisfies CollabMessage);
   };
-
-  // Announce + start the heartbeat so peers see us immediately.
-  store.updatePresence();
+  useCollabStore.getState().updatePresence();
+  requestSchemaState();
+  const syncRetries = [700, 2_000].map((delay) =>
+    window.setTimeout(requestSchemaState, delay),
+  );
 
   const heartbeat = window.setInterval(() => {
     useCollabStore.getState().updatePresence();
@@ -79,22 +121,21 @@ export function startCollabSync(roomId: string): CollabSyncHandle {
 
   return {
     dispose: () => {
+      unsubscribeStatus();
+      unsubscribeMessages();
+      syncRetries.forEach((timer) => window.clearTimeout(timer));
       window.clearInterval(heartbeat);
       window.clearInterval(prune);
       useCollabStore.getState().leaveRoom();
       setCollabOutbound(null);
-      try {
-        channel.close();
-      } catch {
-        /* already closed */
-      }
+      closeTransport();
     },
   };
 }
 
 /**
- * React hook: mount the BroadcastChannel sync for `roomId` while `enabled`.
- * Cleans up (sends `bye`, closes the channel) on disable / unmount.
+ * React hook: mount the transport sync for `roomId` while `enabled`.
+ * Cleans up (sends `bye`, unsubscribes, closes the wire) on disable / unmount.
  */
 export function useCollabSync(roomId: string, enabled: boolean): void {
   useEffect(() => {

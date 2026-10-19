@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# partykit (local dev server storage/runtime)
+/.partykit/
+
 # production
 /build
 

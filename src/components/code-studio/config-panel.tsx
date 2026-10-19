@@ -149,7 +149,7 @@ export function ConfigPanel({
           className="font-mono"
         />
         <p className="mt-2 text-xs text-slate-500">
-          Injetée dans <span className="font-mono">url = env("…")</span> du
+          Injetée dans <span className="font-mono">url = env(&quot;…&quot;)</span> du
           datasource.
         </p>
       </Section>
@@ -182,7 +182,7 @@ export function ConfigPanel({
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-slate-400" />
         <p className="text-xs text-slate-500">
           Les modifications sont appliquées immédiatement au système de fichiers
-          virtuel et survivent aux bascules d'onglets.
+          virtuel et survivent aux bascules d&apos;onglets.
         </p>
       </div>
     </div>

@@ -127,7 +127,7 @@ export function DiagnosticsPanel({
           </p>
           {issues.length === 0 ? (
             <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-500">
-              Aucune erreur d'intégrité. Le graphe est sain. 🎉
+              Aucune erreur d&apos;intégrité. Le graphe est sain. 🎉
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -162,7 +162,7 @@ export function DiagnosticsPanel({
                         size="xs"
                         onClick={() => onRevealTable(issue.target.tableId)}
                       >
-                        Voir dans l'éditeur
+                        Voir dans l&apos;éditeur
                       </Button>
                       <Button
                         variant="ghost"

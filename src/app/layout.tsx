@@ -7,6 +7,7 @@ import { GlobalCelebration } from "@/components/canvas/global-celebration";
 import { RejectionProbe } from "@/components/dev/rejection-probe";
 import { CommandPalette } from "@/components/toolbar/command-palette";
 import { Tooltip } from "@base-ui/react/tooltip";
+import { Analytics } from "@vercel/analytics/react";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -40,6 +41,8 @@ export default function RootLayout({
           </ToastProvider>
           <GlobalCelebration />
         </Tooltip.Provider>
+        {/* Vercel Analytics — route/pageview beacons across the whole app. */}
+        <Analytics />
       </body>
     </html>
   );
