@@ -1,29 +1,35 @@
 import Link from "next/link";
-import { Activity, Boxes, Database } from "lucide-react";
+import { Logo } from "./primitives";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border/60 bg-background/70">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-4 py-10 sm:px-6 md:flex-row">
-        <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Database className="size-4" />
-          </span>
-          <span className="font-semibold tracking-tight">Modelizia</span>
+    <footer className="mdz-footer">
+      <div className="mdz-container">
+        <div className="mdz-footer__top">
+          <div className="mdz-footer__about">
+            <Logo />
+            <p className="mdz-muted">Modélisez vos bases de données sur un canvas infini, générez le code, collaborez en temps réel.</p>
+          </div>
+
+          <nav aria-label="Pied de page" className="mdz-footer__nav">
+            <div>
+              <span className="mdz-group__label">Produit</span>
+              <Link href="/studio">Studio</Link>
+              <Link href="/studio/code">Studio de code</Link>
+            </div>
+            <div>
+              <span className="mdz-group__label">Sur cette page</span>
+              <a href="#fonctionnalites">Fonctionnalités</a>
+              <a href="#code">Génération de code</a>
+              <a href="#collaboration">Collaboration</a>
+            </div>
+          </nav>
         </div>
-        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-          <Link href="/studio" className="transition-colors hover:text-foreground">Studio</Link>
-          <Link href="/studio/code" className="transition-colors hover:text-foreground">Studio de Code</Link>
-          <a href="#features" className="transition-colors hover:text-foreground">Fonctionnalités</a>
-          <a href="#gamification" className="transition-colors hover:text-foreground">Gamification</a>
-        </nav>
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <a href="https://github.com" target="_blank" rel="noreferrer" aria-label="GitHub" className="transition-colors hover:text-foreground"><Boxes className="size-5" /></a>
-          <a href="https://twitter.com" target="_blank" rel="noreferrer" aria-label="Twitter" className="transition-colors hover:text-foreground"><Activity className="size-5" /></a>
+
+        <div className="mdz-footer__bottom">
+          <p>© {new Date().getFullYear()} Modelizia. Tous droits réservés.</p>
+          <p>Construit avec Next.js, GSAP et PartyKit.</p>
         </div>
-      </div>
-      <div className="border-t border-border/60 py-5 text-center text-xs text-muted-foreground">
-        Fait avec <span className="text-rose-500">♥</span> pour les architectes de données. © {new Date().getFullYear()} Modelizia.
       </div>
     </footer>
   );
