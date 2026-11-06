@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
@@ -76,7 +76,7 @@ export function InspectorPanel() {
   const selfRole = useCollabStore((state) => state.self.role);
   const readOnly = selfRole === "viewer" || Boolean(lock);
 
-  // Inline validation: map fieldId → worst severity, plus table-level issues.
+  // Inline validation: map fieldId â†’ worst severity, plus table-level issues.
   const fieldIssues = useMemo(() => {
     const map = new Map<string, "error" | "warning">();
     if (!table) return map;
@@ -106,7 +106,7 @@ export function InspectorPanel() {
     const name = table.name;
     removeTable(table.id);
     setConfirmDelete(false);
-    pushToast(`Table « ${name} » supprimée`, {
+    pushToast(`Table Â« ${name} Â» supprimÃ©e`, {
       type: "info",
       description: "Annulable via Ctrl+Z.",
     });
@@ -115,10 +115,10 @@ export function InspectorPanel() {
   if (!table) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <p className="text-sm font-medium">Aucune table sélectionnée</p>
+        <p className="text-sm font-medium">Aucune table sÃ©lectionnÃ©e</p>
         <p className="text-xs text-muted-foreground">
           Cliquez sur une table du canvas ou du catalogue pour inspecter ses
-          propriétés.
+          propriÃ©tÃ©s.
         </p>
       </div>
     );
@@ -131,22 +131,22 @@ export function InspectorPanel() {
   const theme = getTableColorTheme(table.color);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-background/80 border-l border-border/40">
       {/* Sticky header: identity + quick actions always visible. */}
-      <div className="glass-panel sticky top-0 z-10 shrink-0 space-y-2 border-b p-4 backdrop-blur-md">
+      <div className="sticky top-0 z-10 shrink-0 space-y-2 border-b border-border/40 p-3 bg-background/80 backdrop-blur-md">
         {readOnly && (
           <div
             className={cn(
-              "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium",
+              "flex items-center gap-2 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs font-medium",
               lock
-                ? "bg-orange-500/10 text-orange-700"
-                : "bg-slate-500/10 text-slate-600",
+                ? "bg-orange-500/10 text-orange-700 border-orange-500/30"
+                : "bg-background/80 text-muted-foreground border-border/40",
             )}
           >
             <Lock className="size-3.5 shrink-0" />
             {lock
-              ? `${lock.userName} édite cette table — lecture seule`
-              : "Lecture seule (rôle lecteur)"}
+              ? `${lock.userName} Ã©dite cette table â€” lecture seule`
+              : "Lecture seule (rÃ´le lecteur)"}
           </div>
         )}
         <div className="flex items-center justify-between gap-2">
@@ -156,7 +156,7 @@ export function InspectorPanel() {
             {!hasPk && (
               <span
                 className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600"
-                aria-label="Aucune clé primaire"
+                aria-label="Aucune clÃ© primaire"
               >
                 sans PK
               </span>
@@ -176,7 +176,7 @@ export function InspectorPanel() {
                 disabled={readOnly}
                 onClick={() => {
                   duplicateTable(table.id);
-                  pushToast(`Table « ${table.name} » dupliquée`, { type: "success" });
+                  pushToast(`Table Â« ${table.name} Â» dupliquÃ©e`, { type: "success" });
                 }}
                 aria-label="Dupliquer la table"
               >
@@ -206,22 +206,26 @@ export function InspectorPanel() {
             value={table.name}
             readOnly={readOnly}
             onChange={(event) => renameTable(table.id, event.target.value)}
-            className="mt-1 h-8"
+            className="mt-1 h-7 border-border/60 bg-background/80 focus-visible:ring-ring/50"
           />
         </div>
       </div>
 
       <Tabs defaultValue="fields" className="flex min-h-0 flex-1 flex-col">
-        <TabsList variant="line" className="mx-4 mt-2 w-auto shrink-0 justify-start">
-          <TabsTrigger value="fields">
+        <TabsList variant="line" className="mx-4 mt-2 w-auto shrink-0 justify-start border-b border-border/40">
+          <TabsTrigger value="fields" className="text-xs font-medium text-muted-foreground data-[state=active]:text-primary">
             Champs
-            <span className="text-muted-foreground">{table.fields.length}</span>
+            <span className="text-xs text-muted-foreground">{table.fields.length}</span>
           </TabsTrigger>
-          <TabsTrigger value="constraints">Contraintes</TabsTrigger>
-          <TabsTrigger value="comment">Commentaire</TabsTrigger>
+          <TabsTrigger value="constraints" className="text-xs font-medium text-muted-foreground data-[state=active]:text-primary">
+            Contraintes
+          </TabsTrigger>
+          <TabsTrigger value="comment" className="text-xs font-medium text-muted-foreground data-[state=active]:text-primary">
+            Commentaire
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="fields" className="min-h-0 flex-1 overflow-y-auto glass-scroll p-4">
+        <TabsContent value="fields" className="min-h-0 flex-1 overflow-y-auto glass-scroll p-4 bg-background/80">
           <ul className="space-y-2">
             {table.fields.map((field) => {
               const severity = fieldIssues.get(field.id);
@@ -230,12 +234,12 @@ export function InspectorPanel() {
               <li
                 key={field.id}
                 className={cn(
-                  "space-y-2 rounded-lg border p-2",
+                  "space-y-2 rounded-lg border border-border/40 p-2 bg-background/80",
                   severity === "error"
                     ? "border-destructive/50 bg-destructive/5"
                     : severity === "warning"
                       ? "border-amber-500/50 bg-amber-500/5"
-                      : "border-border",
+                      : "",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -251,7 +255,7 @@ export function InspectorPanel() {
                       name: event.target.value,
                     })
                   }
-                  className="h-7 font-mono text-xs"
+                  className="h-7 font-mono text-xs border-border/60 bg-background/80 focus-visible:ring-ring/50"
                 />
                 <Tooltip label="Supprimer le champ" shortcut="del">
                   <Button
@@ -276,7 +280,7 @@ export function InspectorPanel() {
                       });
                   }}
                 >
-                  <SelectTrigger className="h-7 flex-1 text-xs">
+                  <SelectTrigger className="h-7 flex-1 text-xs border-border/60 bg-background/80">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -297,7 +301,7 @@ export function InspectorPanel() {
                         isNullable: !field.isNullable,
                       })
                     }
-                    aria-label="Activer/désactiver nullable"
+                    aria-label="Activer/dÃ©sactiver nullable"
                   >
                     {field.isNullable ? "?" : "!"}
                   </Button>
@@ -312,7 +316,7 @@ export function InspectorPanel() {
                         isUnique: !field.isUnique,
                       })
                     }
-                    aria-label="Activer/désactiver unique"
+                    aria-label="Activer/dÃ©sactiver unique"
                   >
                     UQ
                   </Button>
@@ -326,8 +330,8 @@ export function InspectorPanel() {
                       updateField(table.id, field.id, { enumName: value });
                   }}
                 >
-                  <SelectTrigger className="h-7 w-full text-xs">
-                    <SelectValue placeholder="Sélectionner un énum" />
+                  <SelectTrigger className="h-7 w-full text-xs border-border/60 bg-background/80">
+                    <SelectValue placeholder="SÃ©lectionner un Ã©num" />
                   </SelectTrigger>
                   <SelectContent>
                     {enums.map((item) => (
@@ -357,12 +361,12 @@ export function InspectorPanel() {
                 >
                   <SelectTrigger
                     className="h-7 flex-1 font-mono text-[11px]"
-                    aria-label="Valeur par défaut prédéfinie"
+                    aria-label="Valeur par dÃ©faut prÃ©dÃ©finie"
                   >
-                    <SelectValue placeholder="Aucune valeur par défaut" />
+                    <SelectValue placeholder="Aucune valeur par dÃ©faut" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Aucune valeur par défaut</SelectItem>
+                    <SelectItem value="__none__">Aucune valeur par dÃ©faut</SelectItem>
                     {DEFAULT_PRESETS.filter((p) => p !== "").map((preset) => (
                       <SelectItem key={preset} value={preset}>
                         {preset}
@@ -379,11 +383,11 @@ export function InspectorPanel() {
                   }
                   placeholder="@default(...)"
                   className="h-7 font-mono text-[11px]"
-                  aria-label="Valeur par défaut brute"
+                  aria-label="Valeur par dÃ©faut brute"
                 />
               </div>
               <div className="flex gap-2">
-                <Tooltip label="Clé primaire">
+                <Tooltip label="ClÃ© primaire">
                   <Button
                     variant={field.isPrimaryKey ? "secondary" : "outline"}
                     size="sm"
@@ -393,7 +397,7 @@ export function InspectorPanel() {
                         isPrimaryKey: !field.isPrimaryKey,
                       })
                     }
-                    aria-label="Activer/désactiver la clé primaire"
+                    aria-label="Activer/dÃ©sactiver la clÃ© primaire"
                   >
                     PK
                   </Button>
@@ -413,7 +417,7 @@ export function InspectorPanel() {
                     []
                   </Button>
                 </Tooltip>
-                <Tooltip label="Met à jour automatiquement la date (@updatedAt)">
+                <Tooltip label="Met Ã  jour automatiquement la date (@updatedAt)">
                   <Button
                     variant={field.isUpdatedAt ? "secondary" : "outline"}
                     size="sm"
@@ -423,7 +427,7 @@ export function InspectorPanel() {
                         isUpdatedAt: !field.isUpdatedAt,
                       })
                     }
-                    aria-label="Activer/désactiver @updatedAt"
+                    aria-label="Activer/dÃ©sactiver @updatedAt"
                   >
                     @updatedAt
                   </Button>
@@ -456,7 +460,7 @@ export function InspectorPanel() {
           </Button>
         </TabsContent>
 
-        <TabsContent value="constraints" className="min-h-0 flex-1 overflow-y-auto glass-scroll p-4">
+        <TabsContent value="constraints" className="min-h-0 flex-1 overflow-y-auto glass-scroll p-4 bg-background/80">
           <ConstraintsSection
             table={table}
             relations={relations}
@@ -476,7 +480,7 @@ export function InspectorPanel() {
           />
         </TabsContent>
 
-        <TabsContent value="comment" className="min-h-0 flex-1 overflow-y-auto glass-scroll p-4">
+        <TabsContent value="comment" className="min-h-0 flex-1 overflow-y-auto glass-scroll p-4 bg-background/80">
           <label className="text-xs text-muted-foreground" htmlFor="table-comment">
             Commentaire de la table (rendu en <code className="font-mono">{"///"}</code> dans Prisma)
           </label>
@@ -484,9 +488,9 @@ export function InspectorPanel() {
             id="table-comment"
             value={table.comment ?? ""}
             onChange={(event) => updateTableComment(table.id, event.target.value)}
-            placeholder="Décrivez le rôle de cette table…"
+            placeholder="DÃ©crivez le rÃ´le de cette tableâ€¦"
             rows={5}
-            className="mt-1 w-full rounded-lg border border-input bg-transparent p-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="mt-1 w-full rounded-lg border border-border/60 bg-background/80 p-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           />
         </TabsContent>
       </Tabs>
@@ -508,10 +512,10 @@ export function InspectorPanel() {
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Supprimer la table « {table.name} » ?</DialogTitle>
+            <DialogTitle>Supprimer la table Â« {table.name} Â» ?</DialogTitle>
             <DialogDescription>
-              Cette action supprimera également ses {table.fields.length} champ(s)
-              et les relations associées. Vous pourrez annuler via Ctrl+Z.
+              Cette action supprimera Ã©galement ses {table.fields.length} champ(s)
+              et les relations associÃ©es. Vous pourrez annuler via Ctrl+Z.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -555,7 +559,7 @@ function EnumSection({
     <div>
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-          Énums
+          Ã‰nums
         </h3>
         <Badge variant="secondary">{enums.length}</Badge>
       </div>
@@ -566,8 +570,8 @@ function EnumSection({
           onKeyDown={(event) => {
             if (event.key === "Enter") submitEnum();
           }}
-          placeholder="Nom de l'énum"
-          className="h-8"
+          placeholder="Nom de l'Ã©num"
+          className="h-7 border-border/60 bg-background/80 focus-visible:ring-ring/50"
         />
         <Button size="icon" className="size-8 shrink-0" onClick={submitEnum}>
           <Plus className="size-4" />
@@ -577,21 +581,21 @@ function EnumSection({
         {enums.map((item) => (
           <li
             key={item.id}
-            className="space-y-2 rounded-lg border border-border p-2"
+            className="space-y-2 rounded-lg border border-border/40 p-2 bg-card/50 backdrop-blur-md"
           >
             <div className="flex items-center gap-2">
               <Input
                 value={item.name}
                 onChange={(event) => renameEnum(item.id, event.target.value)}
-                className="h-7 font-mono text-xs"
+                className="h-7 font-mono text-xs border-border/60 bg-background/80 focus-visible:ring-ring/50"
               />
-              <Tooltip label="Supprimer l'énum">
+              <Tooltip label="Supprimer l'Ã©num">
                 <Button
                   variant="ghost"
                   size="icon"
                   className="size-7 shrink-0 text-destructive hover:text-destructive"
                   onClick={() => removeEnum(item.id)}
-                  aria-label="Supprimer l'énum"
+                  aria-label="Supprimer l'Ã©num"
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
@@ -605,7 +609,7 @@ function EnumSection({
                     onChange={(event) =>
                       updateEnumValue(item.id, index, event.target.value)
                     }
-                    className="h-7 font-mono text-[11px]"
+                    className="h-7 font-mono text-[11px] border-border/60 bg-background/80 focus-visible:ring-ring/50"
                   />
                   <Tooltip label="Supprimer la valeur">
                     <Button
@@ -635,3 +639,4 @@ function EnumSection({
     </div>
   );
 }
+

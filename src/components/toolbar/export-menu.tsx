@@ -57,13 +57,13 @@ export function ExportMenu({
   };
 
   const doPng = (): Promise<void> =>
-    runAsync("png", "archstudio-diagram@3x.png", () => exportCanvasPng("archstudio-diagram@3x.png", 3));
+    runAsync("png", "modelizia-diagram@3x.png", () => exportCanvasPng("modelizia-diagram@3x.png", 3));
 
   const doSvg = (): Promise<void> =>
-    runAsync("svg", "archstudio-diagram.svg", () => exportCanvasSvg());
+    runAsync("svg", "modelizia-diagram.svg", () => exportCanvasSvg());
 
   const doZip = (): Promise<void> =>
-    runAsync("zip", "archstudio-project.zip", () => exportProjectZip(getSchemaAst()));
+    runAsync("zip", "modelizia-project.zip", () => exportProjectZip(getSchemaAst()));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

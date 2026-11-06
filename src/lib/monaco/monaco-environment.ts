@@ -113,7 +113,7 @@ function disabledWorkerUrl(workerId: string, label: string): string {
   // suppression wrapper ever misses, the terminal still explains itself.
   pendingWorkerWarningSuppressions += 2;
   throw new Error(
-    `[archstudio] Monaco web workers are disabled by design (label "${label}", ` +
+    `[modelizia] Monaco web workers are disabled by design (label "${label}", ` +
       `workerId "${workerId}"): Turbopack cannot bundle workers, using the ` +
       `main-thread fallback.`,
   );
@@ -133,7 +133,7 @@ function installWorkerWarningFilter(): void {
       if (
         typeof first === "string" &&
         (first.startsWith("Could not create web worker") ||
-          first.startsWith("[archstudio] Monaco web workers are disabled"))
+          first.startsWith("[modelizia] Monaco web workers are disabled"))
       ) {
         pendingWorkerWarningSuppressions -= 1;
         return;

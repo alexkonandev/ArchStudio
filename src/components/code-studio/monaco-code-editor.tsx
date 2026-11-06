@@ -153,7 +153,7 @@ function configureMonaco(monaco: Monaco): void {
 }
 
 /** CSS class applied to whole-line highlight decorations (see globals.css). */
-const HIGHLIGHT_CLASS = "archstudio-highlight-line";
+const HIGHLIGHT_CLASS = "modelizia-highlight-line";
 
 /**
  * Controlled Monaco surface for a single VFS file. The editor instance is

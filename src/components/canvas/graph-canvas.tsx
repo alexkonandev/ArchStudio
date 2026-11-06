@@ -260,7 +260,7 @@ export function GraphCanvas() {
   return (
     <div
       className={cn(
-        "relative h-full w-full",
+        "relative h-full w-full bg-background",
         effectivePan && "cursor-grab active:cursor-grabbing",
       )}
     >
@@ -289,12 +289,15 @@ export function GraphCanvas() {
         defaultEdgeOptions={{ type: GRAPH_EDGE_TYPE }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls position="bottom-right" />
+        <Controls
+          position="bottom-right"
+          className="!bg-card border border-border/40 shadow-lg ring-1 ring-foreground/10"
+        />
         <MiniMap
           position="bottom-left"
           pannable
           zoomable
-          className="!bg-card"
+          className="!bg-card border border-border/40 shadow-lg ring-1 ring-foreground/10"
         />
         <AlignmentLayer guides={guides} />
       </ReactFlow>
@@ -317,7 +320,7 @@ export function GraphCanvas() {
       )}
 
       {/* Figma-style mode switcher (top-left; HealthScoreBar sits top-center). */}
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 shadow-lg backdrop-blur-md">
+      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-full border border-border/40 bg-background/80 p-1 shadow-lg backdrop-blur-md">
         <Tooltip label="Sélection" shortcut="V">
           <button
             type="button"
@@ -327,8 +330,8 @@ export function GraphCanvas() {
             className={cn(
               "flex size-7 items-center justify-center rounded-full transition-colors",
               mode === "select"
-                ? "bg-slate-900 text-white"
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             <MousePointer2 className="size-4" />
@@ -343,8 +346,8 @@ export function GraphCanvas() {
             className={cn(
               "flex size-7 items-center justify-center rounded-full transition-colors",
               mode === "pan"
-                ? "bg-slate-900 text-white"
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             <Hand className="size-4" />

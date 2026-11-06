@@ -1,5 +1,5 @@
 /**
- * Domain model for ArchStudio advanced collaboration & governance.
+ * Domain model for Modelizia advanced collaboration & governance.
  *
  * Framework-agnostic types shared by the collaboration store, the
  * transport sync adapter (BroadcastChannel / WebSocket) and every

@@ -94,6 +94,10 @@ export function RelationshipEdge({
         path={edgePath}
         markerEnd={markerEnd}
         style={{ ...style, strokeWidth: selected ? 2.5 : 2 }}
+        className={cn(
+          selected ? "stroke-indigo-400" : "stroke-indigo-400/60",
+          selected && "drop-shadow-md",
+        )}
       />
       {/* Permanent cardinality + CASCADE badge (opens the relation popover). */}
       {cardinalityLabel && !pulsing && (
@@ -108,7 +112,7 @@ export function RelationshipEdge({
               "absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[10px] font-semibold shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-md",
               selected
                 ? "border-indigo-400 bg-indigo-500 text-white"
-                : "border-slate-200 bg-white/90 text-slate-600",
+                : "border-border/40 bg-background/80 text-slate-600",
             )}
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,

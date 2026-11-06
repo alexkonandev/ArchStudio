@@ -386,12 +386,12 @@ export function CommandPalette() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             role="combobox"
             aria-expanded={open}
-            aria-controls="archstudio-command-list"
+            aria-controls="modelizia-command-list"
           />
           <Kbd>mod+K</Kbd>
         </div>
         <ul
-          id="archstudio-command-list"
+          id="modelizia-command-list"
           role="listbox"
           className="max-h-72 overflow-y-auto px-1 py-1"
         >

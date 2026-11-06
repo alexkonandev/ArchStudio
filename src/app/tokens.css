@@ -1,0 +1,462 @@
+/* ==========================================================================
+   Modelizia — tokens.css  (source unique de vérité visuelle)
+   Tailwind v4, CSS-first. Remplace :root / .dark / @theme inline de globals.css
+   ET les variables --l-* de landing.css.
+
+   Direction : « papier millimétré » néo-brutaliste — crème chaud, encre noire,
+   un seul accent orange, ombres dures décalées, coins généreux.
+   Contrastes calculés (WCAG) : texte ≥ 4.5:1, éléments d'interface ≥ 3:1.
+   ========================================================================== */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* --------------------------------------------------------------------------
+   1. VALEURS BRUTES — mode clair (défaut)
+   -------------------------------------------------------------------------- */
+:root {
+  /* Surfaces */
+  --background: oklch(0.958 0.012 91.5);          /* #f4f1e8 paper */
+  --foreground: oklch(0.187 0.010 88.8);          /* #15130e ink   */
+  --card: oklch(0.984 0.007 97.3);                /* #fbfaf5       */
+  --card-foreground: oklch(0.187 0.010 88.8);
+  --popover: oklch(0.984 0.007 97.3);
+  --popover-foreground: oklch(0.187 0.010 88.8);
+  --secondary: oklch(0.927 0.019 93.7);           /* #ebe7d9 paper-2 */
+  --secondary-foreground: oklch(0.187 0.010 88.8);
+  --muted: oklch(0.927 0.019 93.7);
+  --muted-foreground: oklch(0.481 0.022 93.9);    /* #625e50 — 5.2:1 sur paper-2 */
+
+  /* Marque : l'orange est ASSOMBRI légèrement vs la landing (#e5421b → #d73202)
+     pour que le texte blanc passe WCAG AA (4.8:1 au lieu de 4.1:1). */
+  --primary: oklch(0.575 0.206 33.9);             /* #d73202 */
+  --primary-foreground: oklch(1 0 0);
+  --brand: oklch(0.575 0.206 33.9);
+  --brand-hover: oklch(0.525 0.195 33.6);
+  --brand-soft: oklch(0.931 0.030 40.9);          /* #fbe2d9 */
+  --accent: oklch(0.931 0.030 40.9);              /* survol doux = brand-soft */
+  --accent-foreground: oklch(0.187 0.010 88.8);
+
+  /* Lignes et focus */
+  --border: oklch(0.864 0.025 91.6);              /* #d8d2c0 */
+  --input: oklch(0.864 0.025 91.6);
+  --ring: oklch(0.187 0.010 88.8);                /* anneau de focus = encre */
+  --ink-line: oklch(0.187 0.010 88.8);            /* contour fort (cartes brutalistes) */
+
+  /* Statuts : fond/graphique + variante « -ink » lisible en texte (≥ 4.8:1) */
+  --success: oklch(0.563 0.119 158.9);            /* #1f8a5b */
+  --success-ink: oklch(0.486 0.114 157.7);
+  --warning: oklch(0.802 0.151 87.1);             /* #e8b730 */
+  --warning-ink: oklch(0.505 0.107 74.6);
+  --info: oklch(0.526 0.263 267.7);               /* #2f4bff */
+  --info-ink: oklch(0.521 0.263 267.7);
+  --destructive: oklch(0.533 0.194 20.1);         /* #c4223a */
+  --destructive-ink: oklch(0.522 0.194 20.1);
+
+  /* Code (panneaux sombres, identiques en clair et sombre) */
+  --code: oklch(0.192 0.010 88.8);
+  --code-foreground: oklch(0.921 0.018 92.7);
+  --code-keyword: oklch(0.761 0.145 36.1);
+  --code-string: oklch(0.827 0.095 154.6);
+  --code-fn: oklch(0.775 0.115 274.1);
+
+  /* Couleurs de table du studio (remplacent emerald/indigo/rose/amber/slate) */
+  --tbl-green: oklch(0.563 0.119 158.9);
+  --tbl-blue: oklch(0.526 0.263 267.7);
+  --tbl-red: oklch(0.575 0.206 33.9);
+  --tbl-yellow: oklch(0.802 0.151 87.1);
+  --tbl-gray: oklch(0.481 0.022 93.9);
+
+  /* Graphiques */
+  --chart-1: var(--brand);
+  --chart-2: var(--info);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--muted-foreground);
+
+  /* Sidebar (shadcn) */
+  --sidebar: oklch(0.927 0.019 93.7);
+  --sidebar-foreground: oklch(0.187 0.010 88.8);
+  --sidebar-primary: oklch(0.575 0.206 33.9);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.864 0.025 91.6);
+  --sidebar-accent-foreground: oklch(0.187 0.010 88.8);
+  --sidebar-border: oklch(0.864 0.025 91.6);
+  --sidebar-ring: oklch(0.187 0.010 88.8);
+
+  /* Forme */
+  --radius: 0.75rem;              /* studio : outils denses */
+  --radius-card: 1.5rem;          /* landing : grandes cartes */
+
+  /* Ombres dures (signature) — la couleur suit le thème */
+  --shadow-color: var(--ink-line);
+  --shadow-hard-sm: 3px 3px 0 var(--shadow-color);
+  --shadow-hard: 6px 6px 0 var(--shadow-color);
+  --shadow-hard-lg: 10px 10px 0 var(--shadow-color);
+  --shadow-hard-brand: 8px 8px 0 var(--brand);
+  --shadow-glow-brand: 0 1px 0 rgb(0 0 0 / 0.18), 0 10px 28px -10px oklch(0.575 0.206 33.9 / 0.7);
+
+  /* Verre (panneaux flottants du studio) */
+  --glass-bg: oklch(0.958 0.012 91.5 / 0.82);
+  --glass-blur: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   2. MODE SOMBRE — mêmes noms, autres valeurs.
+   Même famille chaude (encre + crème), l'orange s'éclaircit pour tenir sur fond sombre.
+   -------------------------------------------------------------------------- */
+.dark {
+  --background: oklch(0.187 0.010 88.8);          /* #15130e */
+  --foreground: oklch(0.958 0.012 91.5);          /* #f4f1e8 */
+  --card: oklch(0.223 0.012 84.5);                /* #1e1b15 */
+  --card-foreground: oklch(0.958 0.012 91.5);
+  --popover: oklch(0.246 0.013 78.0);             /* #24201a */
+  --popover-foreground: oklch(0.958 0.012 91.5);
+  --secondary: oklch(0.274 0.017 86.9);           /* #2b271e */
+  --secondary-foreground: oklch(0.958 0.012 91.5);
+  --muted: oklch(0.274 0.017 86.9);
+  --muted-foreground: oklch(0.712 0.026 91.7);    /* 6.7:1 sur card */
+
+  --primary: oklch(0.705 0.190 35.1);             /* #ff6a45 */
+  --primary-foreground: oklch(0.187 0.010 88.8);  /* encre sur orange : 6.5:1 */
+  --brand: oklch(0.705 0.190 35.1);
+  --brand-hover: oklch(0.747 0.155 35.3);
+  --brand-soft: oklch(0.705 0.190 35.1 / 0.16);
+  --accent: oklch(0.705 0.190 35.1 / 0.16);
+  --accent-foreground: oklch(0.958 0.012 91.5);
+
+  --border: oklch(0.958 0.012 91.5 / 14%);
+  --input: oklch(0.958 0.012 91.5 / 18%);
+  --ring: oklch(0.705 0.190 35.1);
+  --ink-line: oklch(0.958 0.012 91.5 / 70%);
+
+  --success: oklch(0.762 0.154 159.4);
+  --success-ink: oklch(0.762 0.154 159.4);
+  --warning: oklch(0.834 0.144 87.5);
+  --warning-ink: oklch(0.834 0.144 87.5);
+  --info: oklch(0.716 0.149 276.1);
+  --info-ink: oklch(0.716 0.149 276.1);
+  --destructive: oklch(0.715 0.180 15.5);
+  --destructive-ink: oklch(0.715 0.180 15.5);
+
+  --tbl-green: oklch(0.762 0.154 159.4);
+  --tbl-blue: oklch(0.716 0.149 276.1);
+  --tbl-red: oklch(0.705 0.190 35.1);
+  --tbl-yellow: oklch(0.834 0.144 87.5);
+  --tbl-gray: oklch(0.712 0.026 91.7);
+
+  --sidebar: oklch(0.223 0.012 84.5);
+  --sidebar-foreground: oklch(0.958 0.012 91.5);
+  --sidebar-primary: oklch(0.705 0.190 35.1);
+  --sidebar-primary-foreground: oklch(0.187 0.010 88.8);
+  --sidebar-accent: oklch(0.274 0.017 86.9);
+  --sidebar-accent-foreground: oklch(0.958 0.012 91.5);
+  --sidebar-border: oklch(0.958 0.012 91.5 / 14%);
+  --sidebar-ring: oklch(0.705 0.190 35.1);
+
+  --shadow-glow-brand: 0 1px 0 rgb(0 0 0 / 0.4), 0 10px 28px -10px oklch(0.705 0.190 35.1 / 0.55);
+  --glass-bg: oklch(0.223 0.012 84.5 / 0.78);
+}
+
+/* --------------------------------------------------------------------------
+   3. EXPOSITION À TAILWIND  →  bg-brand, text-success-ink, shadow-hard, rounded-card…
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* shadcn (compatibilité des composants existants) */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Nouveaux tokens Modelizia */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-ink-line: var(--ink-line);
+  --color-success: var(--success);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-ink: var(--warning-ink);
+  --color-info: var(--info);
+  --color-info-ink: var(--info-ink);
+  --color-destructive-ink: var(--destructive-ink);
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-keyword: var(--code-keyword);
+  --color-code-string: var(--code-string);
+  --color-code-fn: var(--code-fn);
+  --color-tbl-green: var(--tbl-green);
+  --color-tbl-blue: var(--tbl-blue);
+  --color-tbl-red: var(--tbl-red);
+  --color-tbl-yellow: var(--tbl-yellow);
+  --color-tbl-gray: var(--tbl-gray);
+
+  /* Rayons */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-card: var(--radius-card);
+
+  /* Ombres */
+  --shadow-hard-sm: var(--shadow-hard-sm);
+  --shadow-hard: var(--shadow-hard);
+  --shadow-hard-lg: var(--shadow-hard-lg);
+  --shadow-hard-brand: var(--shadow-hard-brand);
+  --shadow-glow-brand: var(--shadow-glow-brand);
+
+  /* Animation : courbes nommées */
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --------------------------------------------------------------------------
+   4. BASE
+   -------------------------------------------------------------------------- */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: var(--brand);
+    color: oklch(1 0 0);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+}
+
+/* --------------------------------------------------------------------------
+   5. UTILITAIRES PARTAGÉS (landing ET studio)
+   -------------------------------------------------------------------------- */
+@layer components {
+  /* Surface vitrée — remplace l'ancien .glass-panel (qui était blanc/slate en dur) */
+  .glass-panel {
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-color: var(--border);
+  }
+
+  .glass-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .glass-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .glass-scroll::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 9999px; }
+  .glass-scroll::-webkit-scrollbar-track { background: transparent; }
+
+  /* Fond « papier millimétré » */
+  .bg-grid-paper {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 25%, #000 25%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 25%, #000 25%, transparent 75%);
+  }
+  .bg-dots-paper {
+    background-image: radial-gradient(color-mix(in oklch, var(--foreground) 18%, transparent) 1px, transparent 1.2px);
+    background-size: 18px 18px;
+  }
+
+  /* Petit libellé technique au-dessus des titres */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.5rem;
+    height: 1.5px;
+    background: var(--brand);
+  }
+
+  /* Titres de section */
+  .heading-display {
+    font-size: clamp(2rem, 4.2vw, 3.25rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+  }
+
+  /* Carte brutaliste : contour fin, ombre dure au survol */
+  .card-hard {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--card);
+    transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .card-hard:hover {
+      transform: translateY(-3px);
+      border-color: var(--ink-line);
+      box-shadow: var(--shadow-hard);
+    }
+  }
+
+  /* Fenêtre « app » avec grosse ombre dure */
+  .window-hard {
+    border: 1.5px solid var(--ink-line);
+    border-radius: 1.1rem;
+    background: var(--card);
+    box-shadow: var(--shadow-hard-lg);
+    overflow: hidden;
+  }
+
+  /* Panneau de code */
+  .code-panel {
+    background: var(--code);
+    color: var(--code-foreground);
+    border-radius: 1.25rem;
+    border: 1.5px solid var(--ink-line);
+    box-shadow: var(--shadow-hard-brand);
+  }
+  .code-kw { color: var(--code-keyword); }
+  .code-str { color: var(--code-string); }
+  .code-fn { color: var(--code-fn); }
+
+  /* Pastille d'étiquette */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. ANIMATIONS (landing + canvas) — toutes coupées si reduced-motion
+   -------------------------------------------------------------------------- */
+@keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.93); } to { opacity: 1; transform: none; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes blink { 50% { opacity: 0; } }
+
+@keyframes edge-pulse {
+  0% { opacity: 0.15; stroke-width: 3; }
+  25% { opacity: 0.75; stroke-width: 9; }
+  100% { opacity: 0; stroke-width: 3; }
+}
+@keyframes edge-pulse-fade {
+  0% { opacity: 0; transform: translate(-50%, -140%) scale(0.9); }
+  15% { opacity: 1; transform: translate(-50%, -160%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes score-pop {
+  0% { transform: scale(1); } 35% { transform: scale(1.18); } 70% { transform: scale(0.96); } 100% { transform: scale(1); }
+}
+@keyframes badge-shine {
+  0% { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateX(240%) skewX(-18deg); opacity: 0; }
+}
+@keyframes progress-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes node-enter {
+  0% { opacity: 0; transform: scale(0.92) translateY(6px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes field-flash {
+  0% { background-color: color-mix(in oklch, var(--warning) 35%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes score-delta-rise {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.9); }
+  20% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -14px) scale(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .anim-rise { animation: rise 0.9s var(--ease-out-soft) both; animation-delay: var(--d, 0ms); }
+  .anim-pop { transform-box: fill-box; transform-origin: center; animation: pop 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0ms); }
+  .anim-draw { stroke-dasharray: var(--len, 400); stroke-dashoffset: var(--len, 400); animation: draw 1.2s cubic-bezier(0.6, 0, 0.2, 1) forwards; animation-delay: var(--d, 0ms); }
+  .anim-caret { animation: blink 1.1s steps(1) infinite; }
+
+  .score-pop { animation: score-pop 480ms var(--ease-spring); transform-origin: center; }
+  .badge-shine { position: relative; overflow: hidden; }
+  .badge-shine::after {
+    content: ""; position: absolute; inset: 0; width: 40%;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.75), transparent);
+    animation: badge-shine 900ms ease-out forwards; pointer-events: none;
+  }
+  .progress-shimmer {
+    background-image: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.55) 50%, transparent 80%);
+    background-size: 200% 100%;
+    animation: progress-shimmer 2.2s linear infinite;
+  }
+  .node-enter { animation: node-enter 260ms cubic-bezier(0.22, 1, 0.36, 1); transform-origin: center; }
+  .field-flash { animation: field-flash 900ms ease-out forwards; }
+  .score-delta-rise { animation: score-delta-rise 1600ms ease-out forwards; }
+}
+
+/* Surlignage Monaco (diagnostics) */
+.modelizia-highlight-line {
+  background-color: color-mix(in oklch, var(--warning) 14%, transparent);
+  box-shadow: inset 2px 0 0 0 color-mix(in oklch, var(--warning) 60%, transparent);
+}

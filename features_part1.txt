@@ -1,0 +1,15 @@
+const ico = "size-5";
+
+function VisualInfinite() {
+  return (
+    <div className="l-dots relative mt-6 h-40 overflow-hidden rounded-xl border bg-[var(--background)] md:h-52" aria-hidden="true">
+      {[["6%", "14%", "#15130e"], ["34%", "46%", "#e5421b"], ["58%", "10%", "#2f4bff"], ["72%", "58%", "#1f8a5b"], ["14%", "62%", "#7c3aed"]].map(([l, t, c]) => (
+        <span key={`${l}${t}`} className="absolute h-10 w-20 rounded-md border-2 border-[var(--border)] bg-[var(--card)]" style={{ left: l, top: t }}>
+          <span className="block h-3 rounded-t-[4px]" style={{ background: c }} />
+        </span>
+      ))}
+      <span className="absolute inset-x-[22%] inset-y-[18%] rounded-lg border-2 border-dashed border-[var(--brand)]" />
+      <span className="font-mono absolute right-3 bottom-2 text-[10px] l-muted">vue</span>
+    </div>
+  );
+}

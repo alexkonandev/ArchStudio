@@ -15,7 +15,7 @@ import {
 /**
  * Graph store sync adapter.
  *
- * Every ArchStudio window/PC sharing the same collaboration room keeps its
+ * Every Modelizia window/PC sharing the same collaboration room keeps its
  * canvas in sync: a local graph mutation (add/edit/delete table, relation
  * wiring, drag, normalisation, auto-layout) is published on the shared
  * transport, which relays the fresh `{ tables, relations, enums }` snapshot to

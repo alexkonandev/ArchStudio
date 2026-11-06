@@ -41,4 +41,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+# pnpm local store
+.pnpm-store/
+
 next-env.d.ts

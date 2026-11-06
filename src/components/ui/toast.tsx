@@ -4,7 +4,7 @@ import { Toast } from "@base-ui/react/toast"
 import { cn } from "@/lib/utils"
 
 /**
- * Base UI Toast primitives wrapped in the ArchStudio glass design system.
+ * Base UI Toast primitives wrapped in the Modelizia glass design system.
  * A single shared {@link toastManager} lets any module (including non-React
  * store code) push toasts from anywhere.
  */

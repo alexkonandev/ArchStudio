@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/ui/toast";
 import { GlobalCelebration } from "@/components/canvas/global-celebration";
@@ -10,6 +10,7 @@ import { Tooltip } from "@base-ui/react/tooltip";
 import { Analytics } from "@vercel/analytics/react";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "Modelizia — L'art de concevoir vos bases de données",
@@ -31,7 +32,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={cn("font-sans", geist.variable)}>
+    <html
+      lang="fr"
+      className={cn("font-sans", geist.variable, geistMono.variable)}
+    >
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <Tooltip.Provider>
           <ToastProvider>

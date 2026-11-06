@@ -1,5 +1,5 @@
 /**
- * Domain model for the ArchStudio graph (database schema level).
+ * Domain model for the Modelizia graph (database schema level).
  * Framework-agnostic: it is the single source of truth consumed by both
  * the React Flow canvas and the Prisma / SQL codegen engines.
  */

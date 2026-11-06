@@ -82,11 +82,7 @@ export function ProfileModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="border border-slate-200 bg-white text-slate-800 ring-slate-200 sm:max-w-md"
-        // `.glass-panel` (unlayered CSS) outranks Tailwind background
-        // utilities — the inline style guarantees the exact solid-white
-        // light-mode surface required by the design system.
-        style={{ backgroundColor: "#ffffff" }}
+        className="border border-border bg-card text-foreground ring-border sm:max-w-md"
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-800">

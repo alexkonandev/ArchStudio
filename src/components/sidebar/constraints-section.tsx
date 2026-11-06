@@ -55,7 +55,7 @@ export function ConstraintsSection({
             value={indexField}
             onChange={(event) => setIndexField(event.target.value)}
             aria-label="Champ à indexer"
-            className="h-7 flex-1 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring"
+            className="h-7 flex-1 rounded-md border border-border/60 bg-background/80 px-2 text-xs outline-none focus-visible:border-ring"
           >
             <option value="">Champ…</option>
             {table.fields.map((f) => (
@@ -74,7 +74,7 @@ export function ConstraintsSection({
                 "h-7 shrink-0 rounded-md border px-2 font-mono text-[11px] transition-colors",
                 indexUnique
                   ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:bg-muted",
+                  : "border-border/40 bg-background/80 text-muted-foreground hover:bg-muted hover:border-border",
               )}
             >
               UQ
@@ -94,7 +94,7 @@ export function ConstraintsSection({
         </div>
 
         {indexes.length === 0 ? (
-          <p className="mt-2 rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+          <p className="mt-2 rounded-lg border border-dashed border-border/40 p-3 text-center text-xs text-muted-foreground bg-background/80">
             Aucun index.
           </p>
         ) : (
@@ -102,7 +102,7 @@ export function ConstraintsSection({
             {indexes.map((index) => (
               <li
                 key={index.id}
-                className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5"
+                className="flex items-center gap-2 rounded-md border border-border/40 bg-background/80 px-2 py-1.5"
               >
                 <Zap className="size-3.5 shrink-0 text-sky-500" />
                 <span className="min-w-0 flex-1 truncate font-mono text-xs">
@@ -146,7 +146,7 @@ export function ConstraintsSection({
           Relations
         </h3>
         {outgoing.length + incoming.length === 0 ? (
-          <p className="mt-2 rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+          <p className="mt-2 rounded-lg border border-dashed border-border/40 p-3 text-center text-xs text-muted-foreground bg-background/80">
             Aucune relation.
           </p>
         ) : (
@@ -184,7 +184,7 @@ function RelationRow({
   type: string;
 }) {
   return (
-    <li className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5 text-xs">
+    <li className="flex items-center gap-2 rounded-md border border-border/40 bg-background/80 px-2 py-1.5 text-xs">
       <span className="shrink-0 rounded bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[10px] text-indigo-600">
         {badge}
       </span>

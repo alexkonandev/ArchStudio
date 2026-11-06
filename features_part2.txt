@@ -1,0 +1,34 @@
+function VisualSql() {
+  return (
+    <div className="font-mono mt-5 flex items-center gap-3 text-[11px]" aria-hidden="true">
+      <div className="flex-1 rounded-lg bg-[var(--code)] p-3 leading-relaxed text-[var(--code-foreground)]">
+        <span className="l-kw">CREATE TABLE</span> users (
+        <br />
+        &nbsp;&nbsp;id <span className="l-fn">UUID</span> …
+      </div>
+      <span className="l-accent text-base">→</span>
+      <div className="w-20 overflow-hidden rounded-md border-[1.5px] border-[var(--border)]">
+        <div className="bg-[var(--card)] px-2 py-1 font-semibold text-[var(--foreground)]">users</div>
+        <div className="px-2 py-1">id</div>
+      </div>
+    </div>
+  );
+}
+
+function VisualFormats() {
+  return (
+    <div className="font-mono mt-5 flex flex-wrap gap-2 text-xs" aria-hidden="true">
+      {["SQL", "Prisma", "TypeScript", "Zod"].map((f) => <span key={f} className="chip">{f}</span>)}
+    </div>
+  );
+}
+
+function VisualEditor() {
+  return (
+    <div className="font-mono mt-5 rounded-lg bg-[var(--code)] p-3 text-[11px] leading-relaxed text-[var(--code-foreground)]" aria-hidden="true">
+      <div><span className="opacity-40">1&nbsp;&nbsp;</span><span className="l-kw">model</span> Post {"{"}</div>
+      <div><span className="opacity-40">2&nbsp;&nbsp;</span>&nbsp;&nbsp;id <span className="l-fn">String</span> <span className="l-str">@id</span></div>
+      <div><span className="opacity-40">3&nbsp;&nbsp;</span>{"}"}</div>
+    </div>
+  );
+}

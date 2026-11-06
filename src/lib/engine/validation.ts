@@ -1,7 +1,7 @@
 import type { EnumDefinition, Relation, Table, ValidationIssue } from "@/types";
 
 /**
- * Deterministic integrity engine for the ArchStudio graph.
+ * Deterministic integrity engine for the Modelizia graph.
  * Pure function: same inputs -> same issues in the same order.
  *
  * Checks:

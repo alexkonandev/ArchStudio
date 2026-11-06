@@ -1,0 +1,42 @@
+const FEATURES: { title: string; text: string; icon: ReactNode; span: string; visual?: ReactNode }[] = [
+  { title: "Un canvas infini", text: "Pas de page, pas de limite. Déplacez-vous dans des schémas de toutes tailles et gardez la vue d'ensemble.", icon: <InfinityIcon className={ico} />, span: "md:col-span-4", visual: <VisualInfinite /> },
+  { title: "Import SQL", text: "Collez votre SQL existant : le parser reconstruit les tables et les relations.", icon: <Database className={ico} />, span: "md:col-span-2", visual: <VisualSql /> },
+  { title: "Quatre formats générés", text: "Un seul schéma, SQL, Prisma, TypeScript et Zod.", icon: <Braces className={ico} />, span: "md:col-span-2", visual: <VisualFormats /> },
+  { title: "Studio de code", text: "Un éditeur Monaco intégré pour travailler directement sur le code de votre schéma.", icon: <Code className={ico} />, span: "md:col-span-2", visual: <VisualEditor /> },
+  { title: "Temps réel", text: "Plusieurs personnes sur le même schéma, avec présence et curseurs en direct.", icon: <Users className={ico} />, span: "md:col-span-2", visual: <VisualCollab /> },
+  { title: "Export en image", text: "Sortez votre schéma en image pour vos docs, vos PR et vos présentations.", icon: <ImageDown className={ico} />, span: "md:col-span-2" },
+  { title: "Modèles prêts à l'emploi", text: "Partez d'un schéma existant plutôt que d'une page blanche.", icon: <LayoutTemplate className={ico} />, span: "md:col-span-2", visual: <VisualTemplates /> },
+  { title: "Historique et alignement", text: "Annulez, restaurez, alignez, colorez vos tables pour un schéma lisible.", icon: <Undo2 className={ico} />, span: "md:col-span-2", visual: <VisualHistory /> },
+];
+
+export function FeaturesBento() {
+  return (
+    <section id="fonctionnalites" aria-labelledby="features-title" className="py-24 md:py-32">
+      <div className="l-container">
+        <Reveal>
+          <SectionHeading
+            id="features-title"
+            eyebrow="Fonctionnalités"
+            title={<>Tout ce qu'il faut pour<br />penser vos données.</>}
+            description="Un outil de modélisation, pas un énième formulaire : vous voyez votre schéma, vous le manipulez, il produit le code."
+          />
+        </Reveal>
+
+        <div className="mt-16 grid gap-4 md:grid-cols-6">
+          {FEATURES.map((f, i) => (
+            <Reveal key={f.title} delay={(i % 3) * 0.08} className={f.span}>
+              <article className="card-hard flex h-full flex-col p-6 md:p-7">
+                <span className="inline-flex size-10 items-center justify-center rounded-xl text-[var(--foreground)]" aria-hidden="true">
+                  {f.icon}
+                </span>
+                <h3 className="mt-5 text-xl font-semibold tracking-tight">{f.title}</h3>
+                <p className="l-muted mt-2 leading-relaxed text-pretty">{f.text}</p>
+                {f.visual}
+              </article>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

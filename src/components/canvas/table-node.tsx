@@ -84,17 +84,16 @@ export function TableNode({ id, selected }: NodeProps<TableFlowNode>) {
       <FloatingNodeToolbar tableId={table.id} visible={selected} />
       <div
         className={cn(
-          "w-60 overflow-hidden rounded-xl border bg-white/80 text-card-foreground shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-lg",
-          "border-slate-200",
-          selected && cn("shadow-lg ring-2", theme.ring, theme.border),
-          !selected && hasError && "border-destructive",
-          !selected && !hasError && hasWarning && "border-amber-500",
+          "w-60 overflow-hidden rounded-xl border border-border/40 bg-card/90 text-foreground shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-lg",
+          selected && cn("shadow-lg ring-2 ring-primary"),
+          !selected && hasError && "border-destructive/50",
+          !selected && !hasError && hasWarning && "border-amber-500/50",
           isFreshTable && "node-enter",
         )}
       >
         <div
           className={cn(
-            "flex items-center justify-between px-3 py-2",
+            "flex items-center justify-between px-3 py-2 border-b border-border/60",
             theme.header,
           )}
         >
@@ -121,7 +120,7 @@ export function TableNode({ id, selected }: NodeProps<TableFlowNode>) {
               type="button"
               onClick={() => setActiveCommentTableId(table.id)}
               aria-label="Ouvrir les commentaires"
-              className="nodrag relative flex items-center gap-1 rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-white hover:text-foreground"
+              className="nodrag relative flex items-center gap-1 rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <MessageSquare className="size-3" />
               {unread > 0 && (
@@ -130,7 +129,7 @@ export function TableNode({ id, selected }: NodeProps<TableFlowNode>) {
                 </span>
               )}
             </button>
-            <span className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            <span className="rounded bg-background/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
               {table.fields.length} col.
             </span>
           </span>
@@ -150,7 +149,7 @@ export function TableNode({ id, selected }: NodeProps<TableFlowNode>) {
                     : undefined
                 }
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors hover:bg-slate-50/80",
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors hover:bg-muted/50",
                   severity === "error" && "bg-destructive/10",
                   severity === "warning" && "bg-amber-500/10",
                   isFreshField && "field-flash",

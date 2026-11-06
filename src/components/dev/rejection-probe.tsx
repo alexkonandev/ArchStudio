@@ -56,7 +56,7 @@ export function RejectionProbe() {
       // Runs before Next's forwarder: surface the unwrapped payload so the
       // terminal shows the real message + stack instead of `[object …]`.
       console.error(
-        "[archstudio:rejection-probe]",
+        "[modelizia:rejection-probe]",
         JSON.stringify(describeReason(event.reason), null, 2),
       );
     };

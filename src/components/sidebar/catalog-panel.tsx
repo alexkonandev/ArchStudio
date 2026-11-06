@@ -102,13 +102,15 @@ export function CatalogPanel() {
   }, [tables, query, filter, issueByTable]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-3">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-3 bg-background/80 border-r border-border/40">
       {/* Create */}
       <div>
-        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-          Ajouter une table
-        </h2>
-        <div className="mt-2 flex gap-2">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border/40 bg-background/60">
+          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Ajouter une table
+          </h2>
+        </div>
+        <div className="mt-2 flex gap-2 px-3">
           <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -116,7 +118,7 @@ export function CatalogPanel() {
               if (event.key === "Enter") submit();
             }}
             placeholder="Nom de la table"
-            className="h-8"
+            className="h-7 flex-1 border-border/60 bg-background/80 focus-visible:ring-ring/50"
           />
           <Tooltip label="Ajouter la table" shortcut="Entrée">
             <Button
@@ -132,12 +134,12 @@ export function CatalogPanel() {
       </div>
 
       {/* Quick starters: one-click templates (undoable + toast). */}
-      <div className="rounded-lg border border-border">
+      <div className="rounded-lg border border-border/40 px-3 py-2 bg-background/60">
         <button
           type="button"
           onClick={() => setQuickOpen((v) => !v)}
           aria-expanded={quickOpen}
-          className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+          className="flex w-full items-center gap-2 px-2 py-1.5 text-left"
         >
           <LayoutTemplate className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -151,14 +153,14 @@ export function CatalogPanel() {
           />
         </button>
         {quickOpen && (
-          <div className="grid gap-1.5 px-2.5 pb-2.5">
+          <div className="grid gap-1.5 px-2 pb-2">
             {QUICK_STARTERS.map((starter) => (
               <button
                 key={starter.id}
                 type="button"
                 onClick={() => loadQuickStarter(starter.id)}
                 aria-label={`Charger le modèle ${starter.name}`}
-                className="rounded-md border border-border px-2 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                className="rounded-md border border-border/40 px-2 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
               >
                 <span className="block text-xs font-semibold">{starter.name}</span>
                 <span className="mt-0.5 block text-[11px] text-muted-foreground">
@@ -171,14 +173,14 @@ export function CatalogPanel() {
       </div>
 
       {/* Search + filters */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 px-3">
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Rechercher une table ou un champ…"
-            className="h-8 pl-7 text-xs"
+            className="h-7 pl-7 text-xs border-border/60 bg-background/80 focus-visible:ring-ring/50"
           />
         </div>
         <div className="flex items-center gap-1">
@@ -189,10 +191,10 @@ export function CatalogPanel() {
               onClick={() => setFilter(f.id)}
               aria-pressed={filter === f.id}
               className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                "rounded-full border border-border/40 px-2 py-0.5 text-[11px] transition-colors",
                 filter === f.id
                   ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                  : "border-border/40 text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               {f.label}
@@ -205,12 +207,17 @@ export function CatalogPanel() {
       </div>
 
       {/* List (templates live in the Topbar quick-access — undoable). */}
-      <div className="min-h-0 flex-1">
-        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-          Tables
-        </h2>
+      <div className="min-h-0 flex-1 px-3">
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b border-border/40 bg-background/60">
+          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Tables
+          </h2>
+          <span className="text-[10px] text-muted-foreground tabular-nums">
+            {visibleTables.length}/{tables.length}
+          </span>
+        </div>
         {visibleTables.length === 0 ? (
-          <p className="mt-3 rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+          <p className="mt-3 rounded-lg border border-dashed border-border/40 p-3 text-center text-xs text-muted-foreground bg-background/60">
             Aucune table ne correspond.
           </p>
         ) : (
@@ -274,8 +281,10 @@ function CatalogRow({
     <li>
       <div
         className={cn(
-          "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors",
-          active ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-muted",
+          "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors border-transparent",
+          active
+            ? "bg-primary/10 border-primary/30 ring-1 ring-primary/30"
+            : "hover:bg-muted/50 border-border/40",
         )}
       >
         <button
@@ -297,12 +306,14 @@ function CatalogRow({
             </span>
           ) : null}
         </button>
-        <Badge variant="secondary">{fieldCount}</Badge>
+        <Badge variant="secondary" className="shrink-0 rounded bg-muted px-1.5 text-[10px] font-medium text-muted-foreground border border-border/40">
+          {fieldCount}
+        </Badge>
 
         <Menu.Root>
           <Menu.Trigger
             aria-label={`Actions pour ${name}`}
-            className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 data-popup-open:bg-muted data-popup-open:opacity-100"
+            className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 data-popup-open:bg-muted/50 data-popup-open:opacity-100"
           >
             <MenuIcon className="size-3.5" />
           </Menu.Trigger>
